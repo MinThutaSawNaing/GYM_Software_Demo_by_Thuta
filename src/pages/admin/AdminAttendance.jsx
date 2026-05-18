@@ -177,14 +177,14 @@ const glassSelectStyle = {
   border: "1px solid rgba(255,255,255,0.18)",
 };
 
-const SCAN_COOLDOWN_MS = 4000;
+const SCAN_COOLDOWN_MS = 1500;
 
 export default function AdminAttendance() {
   const [activeTab, setActiveTab] = useState("records"); // records | checked
   const [msg, setMsg] = useState(null);
   const scanInputRef = useRef(null);
   const scanTimeoutRef = useRef(null);
-  const lastScanAttemptRef = useRef(0);
+  const cardCooldownsRef = useRef(new Map());
 
   // Records
   const [recordsLoading, setRecordsLoading] = useState(false);
@@ -195,7 +195,7 @@ export default function AdminAttendance() {
 
   // Member card scan panel
   const [scanValue, setScanValue] = useState("");
-  const [scanLoading, setScanLoading] = useState(false);
+  const [activeScanCount, setActiveScanCount] = useState(0);
   const [scanError, setScanError] = useState(null);
   const [scanResult, setScanResult] = useState(null);
   const [scannerActive, setScannerActive] = useState(false);
@@ -211,6 +211,8 @@ export default function AdminAttendance() {
   const showError = (text) => {
     setMsg({ type: "danger", text });
   };
+
+  const scanLoading = activeScanCount > 0;
 
   // ---------------- API calls ----------------
 
@@ -454,17 +456,7 @@ export default function AdminAttendance() {
   }, [records]);
 
   const handleScanSubmit = async (rawValue) => {
-    if (!scannerActive || scanLoading) return;
-    const now = Date.now();
-    const sinceLast = now - lastScanAttemptRef.current;
-    if (lastScanAttemptRef.current && sinceLast < SCAN_COOLDOWN_MS) {
-      const secondsLeft = Math.ceil((SCAN_COOLDOWN_MS - sinceLast) / 1000);
-      setScanError(`Please wait ${secondsLeft} second${secondsLeft === 1 ? "" : "s"} before scanning again.`);
-      setScanValue("");
-      setTimeout(() => scanInputRef.current?.focus(), 0);
-      return;
-    }
-    lastScanAttemptRef.current = now;
+    if (!scannerActive) return;
 
     const cardId = normalizeCardId(rawValue);
     if (!cardId) {
@@ -472,7 +464,18 @@ export default function AdminAttendance() {
       return;
     }
 
-    setScanLoading(true);
+    const lockUntil = cardCooldownsRef.current.get(cardId) ?? 0;
+    const msRemaining = lockUntil - Date.now();
+    if (msRemaining > 0) {
+      const secondsLeft = Math.ceil(msRemaining / 1000);
+      setScanError(`Please wait ${secondsLeft} second${secondsLeft === 1 ? "" : "s"} before scanning this card again.`);
+      setScanValue("");
+      setTimeout(() => scanInputRef.current?.focus(), 0);
+      return;
+    }
+    cardCooldownsRef.current.set(cardId, Date.now() + SCAN_COOLDOWN_MS);
+
+    setActiveScanCount((count) => count + 1);
     setScanError(null);
 
     try {
@@ -509,7 +512,7 @@ export default function AdminAttendance() {
         setScanError(message);
       }
     } finally {
-      setScanLoading(false);
+      setActiveScanCount((count) => Math.max(0, count - 1));
     }
   };
 
@@ -538,7 +541,6 @@ export default function AdminAttendance() {
     setScanValue("");
     setScanResult(null);
     setScanError(null);
-    setScanLoading(false);
     if (scanInputRef.current) {
       scanInputRef.current.focus();
     }
@@ -559,7 +561,7 @@ export default function AdminAttendance() {
       </div>
 
       <RfidInputListener
-        active={scannerActive && !scanLoading}
+        active={scannerActive}
         onScan={(value) => {
           setScanValue(value);
           handleScanSubmit(value);
@@ -574,7 +576,7 @@ export default function AdminAttendance() {
               </div>
               <div style={{ fontSize: 13, ...mutedText }}>Admin can start/stop scanner control for member attendance.</div>
             </div>
-            <span className={`badge ${scanLoading ? "bg-warning text-dark" : "bg-success"}`}>
+            <span className={`badge ${scanLoading ? "bg-warning text-dark" : scannerActive ? "bg-success" : "bg-secondary"}`}>
               {scanControlSyncing ? "Syncing..." : scanLoading ? "Scanning..." : scannerActive ? "Scanner ON" : "Scanner OFF"}
             </span>
           </div>
@@ -604,7 +606,7 @@ export default function AdminAttendance() {
                   setScanControlSyncing(false);
                 }
               }}
-              disabled={scannerActive || scanLoading || scanControlSyncing}
+              disabled={scannerActive || scanControlSyncing}
             >
               Start Scan
             </button>
@@ -646,7 +648,7 @@ export default function AdminAttendance() {
             onKeyDown={handleScanKeyDown}
             placeholder={scannerActive ? "Scan member card ID" : "Click Start Scan to enable reader"}
             autoComplete="off"
-            disabled={!scannerActive || scanLoading}
+            disabled={!scannerActive}
           />
 
           {scanError && (
