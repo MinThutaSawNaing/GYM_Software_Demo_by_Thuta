@@ -22,8 +22,18 @@
   padding-bottom: calc(110px + env(safe-area-inset-bottom));
 }
 
-/* GLASS CARD STYLE */
-.trainer-content > div {
+/* GLASS CARD STYLE (exclude page-transition wrapper) */
+.trainer-content > div:not(.page-transition) {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f1f1;
+}
+
+/* Ensure content inside page-transition still preserves its own card styles */
+.trainer-content > .page-transition > div {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   padding: 18px;
@@ -137,7 +147,8 @@
 }
 
 @media (max-width: 767px) {
-  .trainer-content > div {
+  .trainer-content > div:not(.page-transition),
+  .trainer-content > .page-transition > div {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
   }
 

@@ -110,3 +110,449 @@ body {
   background-color: #212529;
   color: #ffffff;
 }
+
+/* ============================================
+   SMOOTH PAGE & TAB TRANSITIONS
+   ============================================ */
+.page-transition {
+  will-change: opacity, transform;
+  min-height: 0;
+}
+
+/* Instant container (no extra layout wrapper side effects) */
+.page-transition.page-fade-up {
+  animation: pageFadeUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-transition.page-fade {
+  animation: pageFade 0.28s ease-out both;
+}
+
+.page-transition.page-slide-left {
+  animation: pageSlideLeft 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-transition.page-slide-right {
+  animation: pageSlideRight 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* When animation completes, pin to the final state so no flicker */
+.page-transition.page-enter-done {
+  opacity: 1;
+  transform: none;
+}
+
+/* ============================================
+   ADMIN PAGE ENTRANCE — fade in the whole
+   page wrapper when switching sidebar tags
+   ============================================ */
+.admin-main-inner > .page-transition {
+  animation: adminPageIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.admin-main-inner > .page-transition .admin-card,
+.admin-main-inner > .page-transition .card.bg-dark {
+  animation: adminCardIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 1) container-level fade + subtle rise */
+@keyframes adminPageIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2) card-level staggered fade for extra smoothness */
+@keyframes adminCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pageSlideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pageSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ============================================
+   ANIMATED LOADING INDICATOR
+   ============================================ */
+.page-loading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-loading-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.page-loading-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: rgba(255, 255, 255, 0.75);
+  animation: pageLoadingTextPulse 1.2s ease-in-out infinite;
+}
+
+.page-loading-full {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 10, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Inline spinner (small, for buttons / table cells) */
+.page-loading-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.page-loading-inline .page-loading-spinner {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Spinner core */
+.page-loading-spinner {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.page-loading-core {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.35));
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.55);
+  animation: pageLoadingCorePulse 1.6s ease-in-out infinite;
+}
+
+.page-loading-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: rgba(13, 110, 253, 0.9);
+  border-right-color: rgba(102, 16, 242, 0.5);
+  animation: pageLoadingSpin 0.9s linear infinite;
+}
+
+.page-loading-ring-2 {
+  inset: 6px;
+  border-top-color: rgba(52, 211, 153, 0.8);
+  border-right-color: transparent;
+  animation-duration: 1.4s;
+  animation-direction: reverse;
+}
+
+.page-loading-ring-3 {
+  inset: 12px;
+  border-top-color: rgba(251, 146, 60, 0.7);
+  border-right-color: transparent;
+  animation-duration: 2s;
+}
+
+@keyframes pageLoadingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pageLoadingCorePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+}
+
+@keyframes pageLoadingTextPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   FULL-SCREEN PAGE LOADING OVERLAY
+   ============================================ */
+.page-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 10, 0.68);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 1;
+  transition: opacity 260ms ease-out;
+  pointer-events: none;
+}
+
+.page-loading-overlay-fade {
+  opacity: 0;
+}
+
+/* ============================================
+   SHIMMER SKELETON
+   ============================================ */
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: loadingShimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes loadingShimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================
+   ANIMATED NAV INDICATOR (bottom nav)
+   ============================================ */
+.nav-item,
+.user-nav-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-item::before,
+.user-nav-item::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(13, 110, 253, 0.9), rgba(102, 16, 242, 0.9));
+  transform: translateX(-50%);
+  transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-item.active::before,
+.user-nav-item.active::before {
+  width: 24px;
+}
+
+/* Icon/scale feedback on tab activation */
+.nav-item.active .nav-icon,
+.user-nav-item.active .user-nav-icon {
+  transform: translateY(-1px) scale(1.12);
+}
+
+.nav-item .nav-icon,
+.user-nav-item .user-nav-icon {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* Animated soft glow behind active icon */
+.nav-item.active,
+.user-nav-item.active {
+  position: relative;
+}
+
+.nav-item.active::after,
+.user-nav-item.active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: radial-gradient(
+    circle at 50% 30%,
+    rgba(13, 110, 253, 0.18),
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: navGlowPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes navGlowPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   ANIMATED SIDEBAR LINK (admin)
+   ============================================ */
+.admin-link {
+  position: relative;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.admin-link:hover {
+  transform: translateX(2px);
+}
+
+.admin-link.active {
+  transform: translateX(2px);
+}
+
+.admin-link.active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(13, 110, 253, 0.95), rgba(102, 16, 242, 0.95));
+  transform: translateY(-50%);
+  transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-link.active::before {
+  height: 22px;
+}
+
+/* ============================================
+   SMOOTH IN-PAGE TAB CONTENT SWAP
+   ============================================ */
+.tab-pane-transition {
+  animation: tabPaneIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes tabPaneIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animated underline tab links (nav-underline) */
+.nav-underline .nav-link {
+  position: relative;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+.nav-underline .nav-link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateX(-50%);
+  transition: width 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-underline .nav-link.active::after {
+  width: calc(100% - 12px);
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .page-transition,
+  .admin-main-inner > .page-transition .admin-card,
+  .admin-main-inner > .page-transition .card.bg-dark,
+  .nav-item,
+  .user-nav-item,
+  .admin-link,
+  .nav-underline .nav-link,
+  .tab-pane-transition,
+  .page-loading-ring,
+  .page-loading-core,
+  .page-loading-text,
+  .loading-skeleton {
+    animation: none !important;
+    transition: none !important;
+  }
+}

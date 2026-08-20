@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import { scanRfidAttendance } from "../../api/attendanceApi";
+import Loading from "../../components/Loading";
 import RfidInputListener from "../../components/RfidInputListener";
 import { isCardNotRegisteredError, normalizeCardId } from "../../utils/rfid";
 import { awardScanPoints } from "../../api/pointsApi";
@@ -618,7 +619,7 @@ export default function AdminAttendance() {
       </ul>
       
       {activeTab === "checked" && (
-        <div>
+        <div key="tab-checked" className="tab-pane-transition">
           <div className="d-flex align-items-start justify-content-between mb-3">
             <div>
               <h5 className="mb-1" style={titleText}>
@@ -635,7 +636,11 @@ export default function AdminAttendance() {
               }}
               disabled={checkedLoading || activeCheckinsLoading}
             >
-              {checkedLoading || activeCheckinsLoading ? "Loading..." : "Refresh"}
+              {checkedLoading || activeCheckinsLoading ? (
+                <Loading inline size={16} text="" />
+              ) : (
+                "Refresh"
+              )}
             </button>
           </div>
 
@@ -664,7 +669,11 @@ export default function AdminAttendance() {
                 {checkedUsers.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="text-center text-muted py-4">
-                      {checkedLoading ? "Loading..." : "No active check-ins."}
+                      {checkedLoading ? (
+                        <Loading inline size={20} text="Loading..." />
+                      ) : (
+                        "No active check-ins."
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -687,7 +696,7 @@ export default function AdminAttendance() {
 
       {/* ================= RECORDS TAB ================= */}
       {activeTab === "records" && (
-        <div>
+        <div key="tab-records" className="tab-pane-transition">
           <div className="d-flex align-items-start justify-content-between mb-3">
             <div>
               <h5 className="mb-1" style={titleText}>
@@ -697,7 +706,7 @@ export default function AdminAttendance() {
             </div>
 
             <button className="btn btn-outline-light" onClick={() => loadRecords(true)} disabled={recordsLoading}>
-              {recordsLoading ? "Loading..." : "Refresh"}
+              {recordsLoading ? <Loading inline size={16} text="" /> : "Refresh"}
             </button>
           </div>
 
@@ -772,7 +781,11 @@ export default function AdminAttendance() {
                 {filteredRecords.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="text-center text-muted py-4">
-                      {recordsLoading ? "Loading..." : "No attendance records found."}
+                      {recordsLoading ? (
+                        <Loading inline size={20} text="Loading..." />
+                      ) : (
+                        "No attendance records found."
+                      )}
                     </td>
                   </tr>
                 ) : (

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axiosClient, { clearRequestCache } from "../../api/axiosClient";
+import Loading from "../../components/Loading";
 
 function moneyMMK(v) {
   if (v === null || v === undefined || v === "") return "-";
@@ -363,7 +364,7 @@ export default function AdminPricing() {
 
         <button className="btn btn-outline-light" onClick={load} disabled={loading}>
           <i className="bi bi-arrow-clockwise me-2"></i>
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? <Loading inline size={16} text="" /> : "Refresh"}
         </button>
       </div>
 
@@ -646,7 +647,7 @@ export default function AdminPricing() {
               {currentPackages.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="text-center text-muted py-4">
-                    {loading ? "Loading..." : PACKAGE_TYPES[activePackageTab].emptyText}
+                    {loading ? <Loading inline size={20} text="Loading..." /> : PACKAGE_TYPES[activePackageTab].emptyText}
                   </td>
                 </tr>
               ) : (

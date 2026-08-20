@@ -534,146 +534,148 @@ export default function TrainerBooking() {
       {error && <div className="alert alert-danger">{error}</div>}
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
-      {loading ? (
-        <div style={cardStyle}>Loading bookings...</div>
-      ) : filtered.length === 0 ? (
-        <div style={cardStyle}>No bookings found.</div>
-      ) : (
-        <div className="d-flex flex-column gap-2">
-          {filtered.map((b, i) => {
-            const bookingId = b?.id ?? i;
-            const packageType = getPackageType(b);
-            const isMonthlyPackage = isMonthlyBasedBooking(b);
-            const displayStatus = getDisplayBookingStatus(b);
-            const startDate = getBookingStartDateValue(b);
-            const endDate = getBookingEndDateValue(b);
-            const { total: totalSessions, remaining: remainingSessions } = getSessionProgress(b);
-            const isCompleted =
-              remainingSessions === 0 || isCompletedStatus(displayStatus);
-            return (
-              <div
-                key={bookingId}
-                style={{ ...cardStyle, cursor: "pointer" }}
-                onClick={() =>
-                  setSelectedId((prev) => (prev === bookingId ? null : bookingId))
-                }
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setSelectedId((prev) =>
-                      prev === bookingId ? null : bookingId
-                    );
+      <div key={`tab-${activeTab}`} className="tab-pane-transition">
+        {loading ? (
+          <div style={cardStyle}>Loading bookings...</div>
+        ) : filtered.length === 0 ? (
+          <div style={cardStyle}>No bookings found.</div>
+        ) : (
+          <div className="d-flex flex-column gap-2">
+            {filtered.map((b, i) => {
+              const bookingId = b?.id ?? i;
+              const packageType = getPackageType(b);
+              const isMonthlyPackage = isMonthlyBasedBooking(b);
+              const displayStatus = getDisplayBookingStatus(b);
+              const startDate = getBookingStartDateValue(b);
+              const endDate = getBookingEndDateValue(b);
+              const { total: totalSessions, remaining: remainingSessions } = getSessionProgress(b);
+              const isCompleted =
+                remainingSessions === 0 || isCompletedStatus(displayStatus);
+              return (
+                <div
+                  key={bookingId}
+                  style={{ ...cardStyle, cursor: "pointer" }}
+                  onClick={() =>
+                    setSelectedId((prev) => (prev === bookingId ? null : bookingId))
                   }
-                }}
-              >
-                <div className="d-flex justify-content-between">
-                  <div style={{ fontWeight: 900 }}>{getMemberName(b)}</div>
-                  <span style={statusPill(displayStatus)}>
-                    {String(displayStatus || "ACTIVE").toUpperCase()}
-                  </span>
-                </div>
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setSelectedId((prev) =>
+                        prev === bookingId ? null : bookingId
+                      );
+                    }
+                  }}
+                >
+                  <div className="d-flex justify-content-between">
+                    <div style={{ fontWeight: 900 }}>{getMemberName(b)}</div>
+                    <span style={statusPill(displayStatus)}>
+                      {String(displayStatus || "ACTIVE").toUpperCase()}
+                    </span>
+                  </div>
 
-                <div className="mt-2 d-flex gap-2 flex-wrap">
-                  <span style={pill("rgba(255,255,255,0.12)")}>
-                    {getDate(b) || "—"}
-                  </span>
-                  <span style={pill("rgba(255,255,255,0.12)")}>
-                    {getTime(b)}
-                  </span>
-                </div>
+                  <div className="mt-2 d-flex gap-2 flex-wrap">
+                    <span style={pill("rgba(255,255,255,0.12)")}>
+                      {getDate(b) || "—"}
+                    </span>
+                    <span style={pill("rgba(255,255,255,0.12)")}>
+                      {getTime(b)}
+                    </span>
+                  </div>
 
-                {selectedId === bookingId && (
-                  <div
-                    className="mt-3"
-                    style={{
-                      background: "rgba(255,255,255,0.06)",
-                      borderRadius: 12,
-                      padding: 12,
-                      border: "1px solid rgba(255,255,255,0.1)",
-                    }}
-                  >
-                    <div className="d-flex justify-content-between align-items-center">
-                      <div className="d-flex align-items-center gap-2">
-                        <FaUser />
-                        <span style={{ fontWeight: 700 }}>
-                          {getMemberName(b)}
+                  {selectedId === bookingId && (
+                    <div
+                      className="mt-3"
+                      style={{
+                        background: "rgba(255,255,255,0.06)",
+                        borderRadius: 12,
+                        padding: 12,
+                        border: "1px solid rgba(255,255,255,0.1)",
+                      }}
+                    >
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div className="d-flex align-items-center gap-2">
+                          <FaUser />
+                          <span style={{ fontWeight: 700 }}>
+                            {getMemberName(b)}
+                          </span>
+                        </div>
+                        <span style={paidPill(b.paid_status)}>
+                          {String(b.paid_status || "—").toUpperCase()}
                         </span>
                       </div>
-                      <span style={paidPill(b.paid_status)}>
-                        {String(b.paid_status || "—").toUpperCase()}
-                      </span>
-                    </div>
 
-                    <div className="mt-2 d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.8 }}>Phone</span>
-                        <span className="d-flex align-items-center gap-2">
-                          <FaPhoneAlt />
-                          {b?.member?.phone || b?.user?.phone || "—"}
-                        </span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.8 }}>Package type</span>
-                        <span>{packageType}</span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.8 }}>Count</span>
-                        <span>
-                          {totalSessions === null && remainingSessions !== null
-                            ? `${remainingSessions} / —`
-                            : totalSessions === null
-                            ? b?.sessions_count ?? "—"
-                            : `${remainingSessions ?? "—"} / ${totalSessions}`}
-                        </span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.8 }}>Status</span>
-                        <span>{String(displayStatus || "—")}</span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.8 }}>Start Date</span>
-                        <span>{formatDisplayDate(startDate)}</span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.8 }}>End Date</span>
-                        <span>{formatDisplayDate(endDate)}</span>
+                      <div className="mt-2 d-flex flex-column gap-2">
+                        <div className="d-flex justify-content-between">
+                          <span style={{ opacity: 0.8 }}>Phone</span>
+                          <span className="d-flex align-items-center gap-2">
+                            <FaPhoneAlt />
+                            {b?.member?.phone || b?.user?.phone || "—"}
+                          </span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span style={{ opacity: 0.8 }}>Package type</span>
+                          <span>{packageType}</span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span style={{ opacity: 0.8 }}>Count</span>
+                          <span>
+                            {totalSessions === null && remainingSessions !== null
+                              ? `${remainingSessions} / —`
+                              : totalSessions === null
+                              ? b?.sessions_count ?? "—"
+                              : `${remainingSessions ?? "—"} / ${totalSessions}`}
+                          </span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span style={{ opacity: 0.8 }}>Status</span>
+                          <span>{String(displayStatus || "—")}</span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span style={{ opacity: 0.8 }}>Start Date</span>
+                          <span>{formatDisplayDate(startDate)}</span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span style={{ opacity: 0.8 }}>End Date</span>
+                          <span>{formatDisplayDate(endDate)}</span>
+                        </div>
+
+                          {!isMonthlyPackage && (
+                          <div className="d-flex justify-content-between align-items-center">
+                            <span style={{ opacity: 0.8 }}>Session confirmation</span>
+                            <button
+                              className="btn btn-sm btn-outline-info"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (activeTab === "trainer") {
+                                  confirmSession(bookingId);
+                                } else {
+                                  confirmBoxingSession(bookingId);
+                                }
+                              }}
+                              disabled={isCompleted || busyKey === `confirm-${bookingId}` || busyKey === `confirm-boxing-${bookingId}`}
+                              title={isCompleted ? "All sessions completed" : "Confirm this session"}
+                            >
+                              {busyKey === `confirm-${bookingId}` || busyKey === `confirm-boxing-${bookingId}` ? "..." : "Confirm"}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                        {!isMonthlyPackage && (
-                        <div className="d-flex justify-content-between align-items-center">
-                          <span style={{ opacity: 0.8 }}>Session confirmation</span>
-                          <button
-                            className="btn btn-sm btn-outline-info"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (activeTab === "trainer") {
-                                confirmSession(bookingId);
-                              } else {
-                                confirmBoxingSession(bookingId);
-                              }
-                            }}
-                            disabled={isCompleted || busyKey === `confirm-${bookingId}` || busyKey === `confirm-boxing-${bookingId}`}
-                            title={isCompleted ? "All sessions completed" : "Confirm this session"}
-                          >
-                            {busyKey === `confirm-${bookingId}` || busyKey === `confirm-boxing-${bookingId}` ? "..." : "Confirm"}
-                          </button>
+                      {b?.notes && (
+                        <div className="small mt-2" style={{ opacity: 0.9 }}>
+                          <span style={{ fontWeight: 700 }}>Noted:</span> {b.notes}
                         </div>
                       )}
                     </div>
-
-                    {b?.notes && (
-                      <div className="small mt-2" style={{ opacity: 0.9 }}>
-                        <span style={{ fontWeight: 700 }}>Noted:</span> {b.notes}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

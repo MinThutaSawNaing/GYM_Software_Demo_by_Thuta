@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import {
   FiHome,
@@ -10,11 +10,16 @@ import {
 } from "react-icons/fi";
 import axiosClient from "../api/axiosClient";
 import AppScrollbar from "../components/AppScrollbar";
+import PageTransition from "../components/PageTransition";
 import "./UserLayout.css";
 
 export default function UserLayout() {
+  const location = useLocation();
   const [isMobile, setIsMobile] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Smoothly animate content when switching between bottom-nav tabs
+  const locationKey = location.pathname + location.search;
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -106,7 +111,9 @@ export default function UserLayout() {
     <div className="user-shell">
       <AppScrollbar className="user-scrollbar">
         <main className="user-content">
-          <Outlet />
+          <PageTransition transitionKey={locationKey}>
+            <Outlet />
+          </PageTransition>
         </main>
       </AppScrollbar>
 
@@ -143,7 +150,7 @@ export default function UserLayout() {
           <span className="user-nav-label">Messages</span>
         </NavLink>
 
-         <NavLink
+        <NavLink
           to="/user/notifications"
           className={({ isActive }) => "user-nav-item" + (isActive ? " active" : "")}
         >
@@ -167,7 +174,6 @@ export default function UserLayout() {
           </div>
           <span className="user-nav-label">Alerts</span>
         </NavLink>
-
 
         <NavLink
           to="/user/settings"
