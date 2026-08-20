@@ -664,10 +664,26 @@ export default function UserSubsBookings() {
         ))}
       </div>
 
-      {activeTab === "subscriptions" && <UserSubscriptions />}
-      {activeTab === "bookings" && <UserBookings />}
-      {activeTab === "boxing-bookings" && <UserBoxingBookings />}
-      {activeTab === "class-subscriptions" && <UserClassSubscriptions embedded />}
+      {activeTab === "subscriptions" && (
+        <div key="tab-subscriptions" className="tab-pane-transition">
+          <UserSubscriptions />
+        </div>
+      )}
+      {activeTab === "bookings" && (
+        <div key="tab-bookings" className="tab-pane-transition">
+          <UserBookings />
+        </div>
+      )}
+      {activeTab === "boxing-bookings" && (
+        <div key="tab-boxing-bookings" className="tab-pane-transition">
+          <UserBoxingBookings />
+        </div>
+      )}
+      {activeTab === "class-subscriptions" && (
+        <div key="tab-class-subscriptions" className="tab-pane-transition">
+          <UserClassSubscriptions embedded />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
+import Loading from "../../components/Loading";
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -415,7 +416,7 @@ export default function AdminUsers() {
         <div className="d-flex gap-2">
           <button className="btn btn-outline-light" onClick={load} disabled={loading}>
             <i className="bi bi-arrow-clockwise me-2"></i>
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? <Loading inline size={16} text="" /> : "Refresh"}
           </button>
 
           <button className="btn btn-primary" onClick={openCreate}>
@@ -488,7 +489,7 @@ export default function AdminUsers() {
             {pageItems.length === 0 ? (
               <tr>
                 <td colSpan="7" className="text-center text-muted py-4">
-                  {loading ? "Loading..." : "No users found."}
+                  {loading ? <Loading inline size={20} text="Loading..." /> : "No users found."}
                 </td>
               </tr>
             ) : (

@@ -1,12 +1,17 @@
 import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { logoutApi } from "../api/authApi";
 import { clearRequestCache } from "../api/axiosClient";
 import AppScrollbar from "../components/AppScrollbar";
+import PageTransition from "../components/PageTransition";
 import "./AdminLayout.css";
 
 export default function AdminLayout() {
   const nav = useNavigate();
+  const location = useLocation();
+
+  // Smoothly animate content when switching between sidebar links
+  const locationKey = location.pathname + location.search;
 
   const logout = async () => {
     try { await logoutApi(); } catch {}
@@ -117,7 +122,9 @@ export default function AdminLayout() {
               </div>
             </div>
 
-            <Outlet />
+            <PageTransition transitionKey={locationKey}>
+              <Outlet />
+            </PageTransition>
           </div>
         </AppScrollbar>
       </main>

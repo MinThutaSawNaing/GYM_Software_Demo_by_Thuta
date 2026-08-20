@@ -1,5 +1,7 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import Loading from "./components/Loading";
+import PageLoadingOverlay from "./components/PageLoadingOverlay";
 
 const Login = lazy(() => import("./pages/public/Login"));
 const Register = lazy(() => import("./pages/public/Register"));
@@ -97,16 +99,59 @@ function RoleOnly({ role, children }) {
   return have === need ? children : <Navigate to="/login" replace />;
 }
 
+// Warm up all lazy chunks after first paint so switching tabs never hits
+// the network — this is what makes tab-to-tab navigation feel instant.
+const lazyImports = [
+  () => import("./pages/public/Login"),
+  () => import("./pages/public/Register"),
+  () => import("./pages/public/VerifyEmail"),
+  () => import("./layouts/AdminLayout"),
+  () => import("./pages/admin/AdminDashboard"),
+  () => import("./pages/admin/AdminUsers"),
+  () => import("./pages/admin/AdminSubscriptions"),
+  () => import("./pages/admin/AdminClassSubscriptions"),
+  () => import("./pages/admin/AdminPricing"),
+  () => import("./pages/admin/AdminTrainerBookings"),
+  () => import("./pages/admin/AdminBoxingBookings"),
+  () => import("./pages/admin/AdminAttendance"),
+  () => import("./pages/admin/RfidRegister"),
+  () => import("./pages/admin/AdminMessages"),
+  () => import("./pages/admin/AdminBlogs"),
+  () => import("./pages/admin/AdminSettings"),
+  () => import("./pages/admin/AdminUserHistory"),
+  () => import("./pages/admin/AdminPoints"),
+  () => import("./layouts/TrainerLayout"),
+  () => import("./pages/trainer/TrainerHome"),
+  () => import("./pages/trainer/TrainerScan"),
+  () => import("./pages/trainer/TrainerMessages"),
+  () => import("./pages/trainer/TrainerBookings"),
+  () => import("./pages/trainer/TrainerBlogDetails"),
+  () => import("./pages/trainer/TrainerSettings"),
+  () => import("./pages/shared/Notifications"),
+  () => import("./layouts/UserLayout"),
+  () => import("./pages/user/UserHome"),
+  () => import("./pages/user/UserScan"),
+  () => import("./pages/user/UserBlogDetails"),
+  () => import("./pages/user/UserAttendance"),
+  () => import("./pages/user/UserSubsBookings"),
+  () => import("./pages/user/UserMessages"),
+  () => import("./pages/user/UserSettings"),
+  () => import("./pages/user/UserClassSubscriptions"),
+];
+
 export default function App() {
+  // Preload all lazy chunks as early as possible (in the background).
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      Promise.allSettled(lazyImports.map((load) => load()));
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, []);
+
   return (
-    <Suspense
-      fallback={
-        <div className="d-flex min-vh-100 align-items-center justify-content-center">
-          <div className="text-muted">Loading...</div>
-        </div>
-      }
-    >
-      <Routes>
+    <Suspense fallback={<Loading full text="Loading page..." />}>
+      <PageLoadingOverlay minMs={250} text="Refreshing...">
+        <Routes>
         <Route
           path="/"
           element={
@@ -204,8 +249,9 @@ export default function App() {
           <Route path="settings" element={<TrainerSettings />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </PageLoadingOverlay>
     </Suspense>
   );
 }
