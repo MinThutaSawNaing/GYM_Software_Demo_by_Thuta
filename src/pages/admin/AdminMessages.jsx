@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import { formatDateTimeDDMMYYYY } from "../../utils/dateFormat";
+import Loading from "../../components/Loading";
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -207,7 +208,7 @@ export default function AdminMessages() {
         
 
         <button className="btn btn-outline-light" onClick={loadConversations} disabled={loading}>
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? <Loading inline size={16} text="Loading" /> : "Refresh"}
         </button>
       </div>
 
@@ -253,7 +254,7 @@ export default function AdminMessages() {
                   {filteredConvos.length === 0 ? (
                     <tr>
                       <td colSpan="2" className="text-center text-muted py-4">
-                        {loading ? "Loading..." : "No conversations."}
+                        {loading ? <Loading inline size={20} text="Loading conversations" /> : "No conversations."}
                       </td>
                     </tr>
                   ) : (

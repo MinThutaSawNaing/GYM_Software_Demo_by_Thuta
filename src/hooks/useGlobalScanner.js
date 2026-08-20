@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   ATTENDANCE_SCAN_CONTROL_STORAGE_KEY,
   getAttendanceScanControlStatus,
@@ -26,7 +26,6 @@ export function useGlobalScanner() {
   // Initialize from localStorage immediately to avoid flicker
   const getInitialState = () => {
     const cached = readAttendanceScanControlLocal();
-    console.log("[useGlobalScanner] Initial localStorage value:", cached);
     // Default to ON if no cached value exists
     return cached ? !!cached.isActive : true;
   };
@@ -34,29 +33,36 @@ export function useGlobalScanner() {
   const [isScanningEnabled, setIsScanningEnabledState] = useState(getInitialState);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const lastValueRef = useRef(isScanningEnabled);
+
+  // Update state + localStorage ONLY when the value actually changed.
+  // This avoids pointless localStorage writes / storage events on every
+  // 3s poll tick and keeps React re-renders to a minimum.
+  const applyValue = useCallback((value) => {
+    const boolValue = !!value;
+    if (lastValueRef.current === boolValue) return;
+    lastValueRef.current = boolValue;
+    setIsScanningEnabledState(boolValue);
+    saveAttendanceScanControlLocal(boolValue);
+  }, []);
 
   // Wrapper to update both state and localStorage
   const setIsScanningEnabled = useCallback((value) => {
-    const boolValue = !!value;
-    setIsScanningEnabledState(boolValue);
-    saveAttendanceScanControlLocal(boolValue);
-    console.log("[useGlobalScanner] Set scanner state:", boolValue);
-  }, []);
+    applyValue(value);
+  }, [applyValue]);
 
   const refresh = useCallback(async () => {
     try {
       const result = await getAttendanceScanControlStatus();
-      const newValue = !!result?.isActive;
-      setIsScanningEnabledState(newValue);
-      saveAttendanceScanControlLocal(newValue);
+      applyValue(!!result?.isActive);
       setError(null);
-    } catch (e) {
+    } catch {
       // On API error, read from localStorage (set by admin panel)
       const cached = readAttendanceScanControlLocal();
-      setIsScanningEnabledState(cached ? !!cached.isActive : true);
+      applyValue(cached ? !!cached.isActive : true);
       setError("Failed to load scanner status");
     }
-  }, []);
+  }, [applyValue]);
 
   useEffect(() => {
     let alive = true;
@@ -64,17 +70,13 @@ export function useGlobalScanner() {
     const loadScanControl = async () => {
       try {
         const result = await getAttendanceScanControlStatus();
-        console.log("[useGlobalScanner] API result:", result);
         if (!alive) return;
-        const newValue = !!result?.isActive;
-        setIsScanningEnabledState(newValue);
-        saveAttendanceScanControlLocal(newValue);
+        applyValue(!!result?.isActive);
       } catch {
         if (!alive) return;
         // On API error, read from localStorage (set by admin panel)
         const cached = readAttendanceScanControlLocal();
-        console.log("[useGlobalScanner] API failed, using localStorage:", cached);
-        setIsScanningEnabledState(cached ? !!cached.isActive : true);
+        applyValue(cached ? !!cached.isActive : true);
       } finally {
         if (alive) setIsLoading(false);
       }
@@ -82,18 +84,27 @@ export function useGlobalScanner() {
 
     loadScanControl();
 
-    // Poll every 3 seconds to sync with admin changes (faster sync)
-    const intervalId = window.setInterval(loadScanControl, 3000);
+    // Poll every 3 seconds to sync with admin changes (faster sync).
+    // Skip ticks while the tab is hidden to avoid pointless network churn.
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      loadScanControl();
+    }, 3000);
+
+    // Also refresh immediately when the user returns to the tab.
+    const onFocus = () => {
+      if (document.visibilityState === "visible") loadScanControl();
+    };
+    window.addEventListener("focus", onFocus);
 
     // Listen for storage events to sync across tabs
     const onStorage = (event) => {
       if (event.key !== ATTENDANCE_SCAN_CONTROL_STORAGE_KEY) return;
-      console.log("[useGlobalScanner] Storage event received:", event.newValue);
       try {
         const next = event.newValue ? JSON.parse(event.newValue) : null;
-        setIsScanningEnabledState(next ? !!next.isActive : true);
+        applyValue(next ? !!next.isActive : true);
       } catch {
-        setIsScanningEnabledState(true);
+        applyValue(true);
       }
     };
 
@@ -102,9 +113,10 @@ export function useGlobalScanner() {
     return () => {
       alive = false;
       window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
     };
-  }, []);
+  }, [applyValue]);
 
   return {
     isScanningEnabled,

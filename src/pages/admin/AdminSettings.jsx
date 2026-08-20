@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FaLongArrowAltRight } from "react-icons/fa";
-import axiosClient from "../../api/axiosClient";
 import { getUserProfile, updateUserProfile } from "../../api/userApi";
 
 export default function AdminSettings() {
@@ -126,7 +125,10 @@ export default function AdminSettings() {
 
   useEffect(() => {
     checkBackendStatus();
-    const timer = setInterval(checkBackendStatus, 60000);
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      checkBackendStatus();
+    }, 60000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import { formatDateTimeDDMMYYYY } from "../../utils/dateFormat";
+import Loading from "../../components/Loading";
 
 function moneyMMK(v) {
   if (v === null || v === undefined || v === "") return "-";
@@ -847,7 +848,9 @@ export default function AdminBoxingBookings() {
   useEffect(() => {
     if (!showDetails) return undefined;
     loadBookings();
-    const interval = setInterval(loadBookings, 15000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") loadBookings();
+    }, 15000);
     return () => clearInterval(interval);
   }, [showDetails]);
 
@@ -855,7 +858,9 @@ export default function AdminBoxingBookings() {
   useEffect(() => {
     if (!showModal) return undefined;
     loadBoxingPackages();
-    const interval = setInterval(loadBoxingPackages, 15000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") loadBoxingPackages();
+    }, 15000);
     return () => clearInterval(interval);
   }, [showModal]);
 
@@ -1120,7 +1125,7 @@ export default function AdminBoxingBookings() {
 
           <button className="btn btn-outline-light" onClick={loadBookings} disabled={loading}>
             <i className="bi bi-arrow-clockwise me-2"></i>
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? <Loading inline size={16} text="Loading" /> : "Refresh"}
           </button>
         </div>
       </div>
@@ -1224,7 +1229,7 @@ export default function AdminBoxingBookings() {
             {filteredBookings.length === 0 ? (
               <tr>
                 <td colSpan="9" className="text-center text-muted py-4">
-                  {loading ? "Loading..." : "No bookings found."}
+                  {loading ? <Loading inline size={20} text="Loading bookings" /> : "No bookings found."}
                 </td>
               </tr>
             ) : (

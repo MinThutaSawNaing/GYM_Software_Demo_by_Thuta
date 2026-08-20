@@ -1,4 +1,4 @@
-# Unity Fitness Gym Management System — Frontend
+# Winter Arc Software — Frontend
 
 A React + Vite frontend for managing day-to-day operations of a gym, including member onboarding, trainer workflows, subscriptions, bookings, attendance scanning, messaging, and admin reporting.
 

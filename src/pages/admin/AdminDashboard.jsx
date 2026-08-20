@@ -1,6 +1,7 @@
 // AdminDashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axiosClient from "../../api/axiosClient";
+import useRealtimePolling from "../../hooks/useRealtimePolling";
 
 import {
   ResponsiveContainer,
@@ -65,6 +66,10 @@ const deepPick = (obj, paths, fallback = 0) => {
 
 const sumArr = (arr = []) => arr.reduce((a, b) => a + n(b), 0);
 const lastVal = (arr = []) => (arr.length ? n(arr[arr.length - 1]) : 0);
+
+// Cheap compare for small chart datasets. Lets the 30s polling skip setState
+// (and therefore the recharts re-render) when the numbers haven't changed.
+const hasDataChanged = (a, b) => JSON.stringify(a) !== JSON.stringify(b);
 
 const normalizeMonthLabel = (value) => {
   if (value === undefined || value === null) return "";
@@ -193,7 +198,7 @@ const cardGlass = {
 const titleText = { color: "rgba(255,255,255,0.92)" };
 const mutedText = { color: "rgba(255,255,255,0.60)" };
 
-function MetricAreaChart({ title, data, stroke, fill }) {
+const MetricAreaChart = React.memo(function MetricAreaChart({ title, data, stroke, fill }) {
   return (
     <div className="p-3 mb-3" style={{ ...cardGlass, background: "rgba(255,255,255,0.06)" }}>
       <div className="d-flex justify-content-between align-items-center mb-2">
@@ -216,13 +221,13 @@ function MetricAreaChart({ title, data, stroke, fill }) {
               }}
               labelStyle={{ color: "#fff" }}
             />
-            <Area type="monotone" dataKey="value" stroke={stroke} fill={fill} strokeWidth={2} />
+            <Area type="monotone" dataKey="value" stroke={stroke} fill={fill} strokeWidth={2} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>
   );
-}
+});
 
 export default function AdminDashboard() {
   const [msg, setMsg] = useState(null);
@@ -304,10 +309,17 @@ export default function AdminDashboard() {
         "Boxing Bookings",
       ]);
 
-      setUsersGrowthData(normalizeGrowthSeries(labels, usersSeries));
-      setSubscriptionsData(normalizeGrowthSeries(labels, subscriptionsSeries));
-      setTrainerBookingsData(normalizeGrowthSeries(labels, trainerBookingsSeries));
-      setBoxingBookingsData(normalizeGrowthSeries(labels, boxingBookingsSeries));
+      const nextUsersGrowth = normalizeGrowthSeries(labels, usersSeries);
+      const nextSubscriptions = normalizeGrowthSeries(labels, subscriptionsSeries);
+      const nextTrainerBookings = normalizeGrowthSeries(labels, trainerBookingsSeries);
+      const nextBoxingBookings = normalizeGrowthSeries(labels, boxingBookingsSeries);
+
+      // Only update state when data actually changed — this prevents needless
+      // recharts re-renders on every 30s poll when the numbers are unchanged.
+      setUsersGrowthData((prev) => (hasDataChanged(prev, nextUsersGrowth) ? nextUsersGrowth : prev));
+      setSubscriptionsData((prev) => (hasDataChanged(prev, nextSubscriptions) ? nextSubscriptions : prev));
+      setTrainerBookingsData((prev) => (hasDataChanged(prev, nextTrainerBookings) ? nextTrainerBookings : prev));
+      setBoxingBookingsData((prev) => (hasDataChanged(prev, nextBoxingBookings) ? nextBoxingBookings : prev));
     } catch (e) {
       if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
 
@@ -322,22 +334,20 @@ export default function AdminDashboard() {
     if (didInitRef.current) return;
     didInitRef.current = true;
 
-    loadReport();
-    loadGrowthSeries(6);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ✅ optional polling for “real-time”
-  useEffect(() => {
-    if (!POLL_GROWTH_EVERY_MS) return;
-
-    const t = setInterval(() => {
+    // Defer the initial fetch so the effect body never calls setState
+    // synchronously (react-hooks/set-state-in-effect).
+    const t = window.setTimeout(() => {
+      loadReport();
       loadGrowthSeries(6);
-    }, POLL_GROWTH_EVERY_MS);
+    }, 0);
 
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => window.clearTimeout(t);
   }, []);
+
+  // ✅ optional polling for "real-time" (visibility-aware: pauses while the tab
+  // is hidden, never overlaps an in-flight request, and only re-renders when
+  // the data actually changed — see hasDataChanged guard in loadGrowthSeries).
+  useRealtimePolling(() => loadGrowthSeries(6), POLL_GROWTH_EVERY_MS, []);
 
   // metrics from attendance report
   const metrics = useMemo(() => {
@@ -563,8 +573,8 @@ export default function AdminDashboard() {
                     labelStyle={{ color: "#fff" }}
                   />
                   <Legend />
-                  <Bar dataKey="check_in" name="Check-ins" fill="#60a5fa" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="check_out" name="Check-outs" fill="#fbbf24" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="check_in" name="Check-ins" fill="#60a5fa" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="check_out" name="Check-outs" fill="#fbbf24" radius={[6, 6, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

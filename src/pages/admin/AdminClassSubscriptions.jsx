@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { formatDateDDMMYYYY } from "../../utils/dateFormat";
+import Loading from "../../components/Loading";
 
 function moneyMMK(v) {
   if (v === null || v === undefined || v === "") return "-";
@@ -712,7 +713,7 @@ export default function AdminClassSubscriptions() {
           </button>
           <button className="btn btn-sm btn-outline-light" onClick={loadRecords} disabled={loading}>
             <i className="bi bi-arrow-clockwise me-2"></i>
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? <Loading inline size={16} text="Loading" /> : "Refresh"}
           </button>
         </div>
       </div>
@@ -799,7 +800,7 @@ export default function AdminClassSubscriptions() {
           <tbody>
             {filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan="12" className="text-center text-muted py-4">{loading ? "Loading..." : tableSearch.trim() ? "No class memberships matched your search." : "No class memberships found."}</td>
+                <td colSpan="12" className="text-center text-muted py-4">{loading ? <Loading inline size={20} text="Loading class memberships" /> : tableSearch.trim() ? "No class memberships matched your search." : "No class memberships found."}</td>
               </tr>
             ) : (
               paginatedRecords.map((r, index) => {

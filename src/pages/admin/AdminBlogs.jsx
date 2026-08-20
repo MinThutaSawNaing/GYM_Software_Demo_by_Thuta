@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axiosClient, { clearRequestCache } from "../../api/axiosClient";
 import { formatDateDDMMYYYY } from "../../utils/dateFormat";
+import Loading from "../../components/Loading";
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -566,7 +567,7 @@ export default function AdminBlogs() {
 
         <div className="d-flex gap-2">
           <button className="btn btn-outline-light" onClick={loadBlogs} disabled={loading}>
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? <Loading inline size={16} text="Loading" /> : "Refresh"}
           </button>
           <button className="btn btn-success" onClick={openCreate}>
             NEW BLOG POST
@@ -590,7 +591,7 @@ export default function AdminBlogs() {
             {sortedBlogs.length === 0 ? (
               <tr>
                 <td colSpan="5" className="text-center text-muted py-4">
-                  {loading ? "Loading..." : "No blog posts created yet."}
+                  {loading ? <Loading inline size={20} text="Loading blogs" /> : "No blog posts created yet."}
                 </td>
               </tr>
             ) : (

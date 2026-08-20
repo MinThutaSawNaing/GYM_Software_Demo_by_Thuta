@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Loading from "./Loading";
 
 /**
  * Full-screen animated loading overlay.
  *
- * - Shows briefly on every page refresh (initial mount).
- * - Re-shows briefly whenever the route changes (tag-to-tag navigation),
- *   giving the user a clear loading transition.
+ * - Shows ONLY once on the initial mount — i.e. a real page refresh/reload.
+ * - Does NOT re-show when navigating between tabs/pages, so tag-to-tag
+ *   navigation stays instant with no loading flash.
  * - Fades out smoothly via CSS transition.
  *
  * Usage: wrap once around <Routes> in App.jsx
@@ -20,34 +19,27 @@ export default function PageLoadingOverlay({
   minMs = 300,
   text = "Loading...",
 }) {
-  const location = useLocation();
   const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
-  // skip the very first effect run if pathname effect below handles it
-  const firstRenderRef = useRef(true);
 
-  const hide = useCallback(() => {
-    setFading(true);
-    const t = window.setTimeout(() => {
-      setVisible(false);
-      setFading(false);
-    }, 260); // match overlay fade-out duration
-    return () => window.clearTimeout(t);
-  }, []);
-
-  // Re-show overlay whenever the route changes (also fires on mount = refresh)
+  // Show the overlay only on the very first mount (page refresh).
+  // Route changes (tag-to-tag navigation) must NOT show it again.
   useEffect(() => {
-    if (firstRenderRef.current) {
-      firstRenderRef.current = false;
-    } else {
-      setVisible(true);
-      setFading(false);
-    }
+    let fadeTimer = null;
 
-    const showTimer = window.setTimeout(hide, minMs);
+    const showTimer = window.setTimeout(() => {
+      setFading(true);
+      fadeTimer = window.setTimeout(() => {
+        setVisible(false);
+        setFading(false);
+      }, 260); // match overlay fade-out duration
+    }, minMs);
 
-    return () => window.clearTimeout(showTimer);
-  }, [location.pathname, minMs, hide]);
+    return () => {
+      window.clearTimeout(showTimer);
+      if (fadeTimer) window.clearTimeout(fadeTimer);
+    };
+  }, [minMs]);
 
   if (!visible) return children;
 

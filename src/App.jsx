@@ -99,53 +99,80 @@ function RoleOnly({ role, children }) {
   return have === need ? children : <Navigate to="/login" replace />;
 }
 
-// Warm up all lazy chunks after first paint so switching tabs never hits
-// the network — this is what makes tab-to-tab navigation feel instant.
-const lazyImports = [
-  () => import("./pages/public/Login"),
-  () => import("./pages/public/Register"),
-  () => import("./pages/public/VerifyEmail"),
-  () => import("./layouts/AdminLayout"),
-  () => import("./pages/admin/AdminDashboard"),
-  () => import("./pages/admin/AdminUsers"),
-  () => import("./pages/admin/AdminSubscriptions"),
-  () => import("./pages/admin/AdminClassSubscriptions"),
-  () => import("./pages/admin/AdminPricing"),
-  () => import("./pages/admin/AdminTrainerBookings"),
-  () => import("./pages/admin/AdminBoxingBookings"),
-  () => import("./pages/admin/AdminAttendance"),
-  () => import("./pages/admin/RfidRegister"),
-  () => import("./pages/admin/AdminMessages"),
-  () => import("./pages/admin/AdminBlogs"),
-  () => import("./pages/admin/AdminSettings"),
-  () => import("./pages/admin/AdminUserHistory"),
-  () => import("./pages/admin/AdminPoints"),
-  () => import("./layouts/TrainerLayout"),
-  () => import("./pages/trainer/TrainerHome"),
-  () => import("./pages/trainer/TrainerScan"),
-  () => import("./pages/trainer/TrainerMessages"),
-  () => import("./pages/trainer/TrainerBookings"),
-  () => import("./pages/trainer/TrainerBlogDetails"),
-  () => import("./pages/trainer/TrainerSettings"),
-  () => import("./pages/shared/Notifications"),
-  () => import("./layouts/UserLayout"),
-  () => import("./pages/user/UserHome"),
-  () => import("./pages/user/UserScan"),
-  () => import("./pages/user/UserBlogDetails"),
-  () => import("./pages/user/UserAttendance"),
-  () => import("./pages/user/UserSubsBookings"),
-  () => import("./pages/user/UserMessages"),
-  () => import("./pages/user/UserSettings"),
-  () => import("./pages/user/UserClassSubscriptions"),
-];
+// Preload the route chunks for the CURRENT role while the browser is idle.
+// The old approach eagerly fetched ALL 30+ chunks 400ms after every page load
+// (for every role) — a huge network burst that made the first screens feel
+// laggy. Role-scoped + idle preloading keeps tab switching instant without
+// wasting bandwidth on routes the user can never visit.
+const roleImports = {
+  admin: [
+    () => import("./layouts/AdminLayout"),
+    () => import("./pages/admin/AdminDashboard"),
+    () => import("./pages/admin/AdminUsers"),
+    () => import("./pages/admin/AdminSubscriptions"),
+    () => import("./pages/admin/AdminClassSubscriptions"),
+    () => import("./pages/admin/AdminPricing"),
+    () => import("./pages/admin/AdminTrainerBookings"),
+    () => import("./pages/admin/AdminBoxingBookings"),
+    () => import("./pages/admin/AdminAttendance"),
+    () => import("./pages/admin/RfidRegister"),
+    () => import("./pages/admin/AdminMessages"),
+    () => import("./pages/admin/AdminBlogs"),
+    () => import("./pages/admin/AdminSettings"),
+    () => import("./pages/admin/AdminUserHistory"),
+    () => import("./pages/admin/AdminPoints"),
+  ],
+  trainer: [
+    () => import("./layouts/TrainerLayout"),
+    () => import("./pages/trainer/TrainerHome"),
+    () => import("./pages/trainer/TrainerScan"),
+    () => import("./pages/trainer/TrainerMessages"),
+    () => import("./pages/trainer/TrainerBookings"),
+    () => import("./pages/trainer/TrainerBlogDetails"),
+    () => import("./pages/trainer/TrainerSettings"),
+    () => import("./pages/shared/Notifications"),
+  ],
+  user: [
+    () => import("./layouts/UserLayout"),
+    () => import("./pages/user/UserHome"),
+    () => import("./pages/user/UserScan"),
+    () => import("./pages/user/UserBlogDetails"),
+    () => import("./pages/user/UserAttendance"),
+    () => import("./pages/user/UserSubsBookings"),
+    () => import("./pages/user/UserMessages"),
+    () => import("./pages/user/UserSettings"),
+    () => import("./pages/user/UserClassSubscriptions"),
+  ],
+  public: [
+    () => import("./pages/public/Login"),
+    () => import("./pages/public/Register"),
+    () => import("./pages/public/VerifyEmail"),
+  ],
+};
 
 export default function App() {
-  // Preload all lazy chunks as early as possible (in the background).
+  // Warm up only the chunks the current user can actually visit, during
+  // browser idle time — not 400ms after mount, which fought with first paint.
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      Promise.allSettled(lazyImports.map((load) => load()));
-    }, 400);
-    return () => window.clearTimeout(id);
+    const role = getToken() ? normRole(getUser()?.role) : "public";
+    const loaders =
+      role === "administrator" || role === "admin"
+        ? roleImports.admin
+        : role === "trainer"
+          ? roleImports.trainer
+          : role === "public"
+            ? roleImports.public
+            : roleImports.user;
+
+    const idle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 1000));
+    const id = idle(() => {
+      Promise.allSettled(loaders.map((load) => load()));
+    }, { timeout: 2500 });
+
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(id);
+      else clearTimeout(id);
+    };
   }, []);
 
   return (

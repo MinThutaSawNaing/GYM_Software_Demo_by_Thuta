@@ -27,7 +27,9 @@ export default function useRealtimePolling(task, intervalMs = 10000, deps = []) 
     };
 
     runTask({ silent: false });
-    timer = window.setInterval(run, intervalMs);
+    if (intervalMs > 0) {
+      timer = window.setInterval(run, intervalMs);
+    }
 
     const onFocus = () => runTask({ silent: true });
     const onVisible = () => {

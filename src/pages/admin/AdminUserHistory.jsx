@@ -405,10 +405,6 @@ export default function AdminUserHistory() {
       return;
     }
     
-    console.log("[AdminUserHistory] Loading records for user ID:", recordId);
-    console.log("[AdminUserHistory] URL param 'id':", id);
-    console.log("[AdminUserHistory] userFromState:", userFromState);
-    
     setError(null);
     setLoading(true);
     requestRef.current += 1;
@@ -416,16 +412,13 @@ export default function AdminUserHistory() {
     try {
       let res;
       try {
-        console.log("[AdminUserHistory] Trying GET /user/" + recordId + "/records");
         res = await axiosClient.get(`/user/${recordId}/records`);
       } catch (primaryErr) {
         if (primaryErr?.response?.status !== 404) throw primaryErr;
-        console.log("[AdminUserHistory] Fallback to GET /users/" + recordId + "/records");
         res = await axiosClient.get(`/users/${recordId}/records`);
       }
       const payload = res?.data || {};
-      console.log("[AdminUserHistory] API response payload:", payload);
-      
+
       if (requestId === requestRef.current) {
         setUserProfile(payload?.user ?? null);
         const subscriptions = normalizeArray(payload.subscriptions);

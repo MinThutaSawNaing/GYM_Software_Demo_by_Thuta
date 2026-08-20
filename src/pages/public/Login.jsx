@@ -96,7 +96,7 @@ export default function Login() {
           <div className="login-icon">
             <img src="/UNITY%20LOGO.jpg" alt="Unity Fitness logo" className="login-logo" />
           </div>
-          <h4 className="login-title">Welcome to UNITY FITNESS</h4>
+          <h4 className="login-title">Welcome to Winter Arc Software</h4>
           <p className="glass-subtitle">Sign in to continue</p>
         </div>
 

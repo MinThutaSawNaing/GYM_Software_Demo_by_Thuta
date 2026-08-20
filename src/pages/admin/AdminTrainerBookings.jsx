@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import { formatDateTimeDDMMYYYY } from "../../utils/dateFormat";
+import Loading from "../../components/Loading";
 
 function moneyMMK(v) {
   if (v === null || v === undefined || v === "") return "-";
@@ -1073,7 +1074,7 @@ export default function AdminTrainerBookings() {
 
           <button className="btn btn-outline-light" onClick={loadBookings} disabled={loading}>
             <i className="bi bi-arrow-clockwise me-2"></i>
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? <Loading inline size={16} text="Loading" /> : "Refresh"}
           </button>
         </div>
       </div>
@@ -1177,7 +1178,7 @@ export default function AdminTrainerBookings() {
             {filteredBookings.length === 0 ? (
               <tr>
                 <td colSpan="9" className="text-center text-muted py-4">
-                  {loading ? "Loading..." : "No bookings found."}
+                  {loading ? <Loading inline size={20} text="Loading bookings" /> : "No bookings found."}
                 </td>
               </tr>
             ) : (

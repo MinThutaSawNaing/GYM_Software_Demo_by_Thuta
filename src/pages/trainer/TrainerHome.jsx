@@ -148,7 +148,7 @@ export default function TrainerHome() {
 
   return (
     <div>
-      <h2 className="trainer-home-title">Unity Fitness</h2>
+      <h2 className="trainer-home-title">Winter Arc Software</h2>
 
       <h3 className="trainer-home-subtitle">Blogs</h3>
 

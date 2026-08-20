@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import Loading from "../../components/Loading";
@@ -9,6 +9,66 @@ function normalizeList(payload) {
   if (Array.isArray(payload?.users)) return payload.users;
   if (Array.isArray(payload?.data?.data)) return payload.data.data;
   return [];
+}
+
+// Detect whether the backend returns Laravel-style pagination
+// ({ data: [...], current_page, last_page, total, ... }) or a plain array.
+// Returns { users, mode: "server"|"client" } (+ pagination metadata).
+function parseUsersResponse(payload) {
+  const envelopes = [];
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    envelopes.push(payload);
+    // Some APIs wrap the metadata under payload.data instead.
+    if (payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+      envelopes.push(payload.data);
+    }
+  }
+
+  for (const envelope of envelopes) {
+    const rows = Array.isArray(envelope.data)
+      ? envelope.data
+      : Array.isArray(envelope.users)
+        ? envelope.users
+        : Array.isArray(envelope.items)
+          ? envelope.items
+          : null;
+    if (!rows) continue;
+
+    const meta = envelope.meta || envelope.pagination || null;
+    const perPage =
+      Number(envelope.per_page) ||
+      Number(envelope.perPage) ||
+      Number(meta?.per_page) ||
+      10;
+    const rawTotal =
+      envelope.total ?? envelope.total_count ?? meta?.total ?? meta?.total_count ?? null;
+    const total = rawTotal === null || rawTotal === undefined ? null : Number(rawTotal);
+    const lastPage =
+      Number(envelope.last_page) ||
+      Number(envelope.lastPage) ||
+      Number(meta?.last_page) ||
+      (total !== null && perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : null);
+
+    const isPaginated =
+      envelope.current_page !== undefined ||
+      envelope.last_page !== undefined ||
+      envelope.lastPage !== undefined ||
+      envelope.total !== undefined ||
+      meta !== null;
+
+    if (isPaginated) {
+      return {
+        users: rows,
+        mode: "server",
+        page: Math.max(1, Number(envelope.current_page) || Number(meta?.current_page) || 1),
+        perPage,
+        total,
+        lastPage: lastPage ?? 1,
+      };
+    }
+  }
+
+  return { users: normalizeList(payload), mode: "client" };
 }
 
 const emptyCreate = {
@@ -53,16 +113,11 @@ function getUserRecordId(user) {
   const directId = user?.id ?? user?.user?.id ?? user?.member_id ?? null;
   
   if (directId !== null && directId !== undefined) {
-    console.log("[getUserRecordId] Found database ID:", directId, "for user:", user?.name);
     return directId;
   }
   
   // FALLBACK: user_id is NOT the database ID, but use it if nothing else is available
   const fallbackUserId = user?.user_id ?? null;
-  if (fallbackUserId !== null && fallbackUserId !== undefined) {
-    console.warn("[getUserRecordId] WARNING: Using user_id as fallback:", fallbackUserId, "for user:", user?.name);
-    console.warn("[getUserRecordId] This may cause ID mismatch! User object:", user);
-  }
   
   return fallbackUserId;
 }
@@ -91,6 +146,80 @@ function getStableRowKey(u) {
   return `fallback:${name}:${phone}`;
 }
 
+const UserRow = React.memo(function UserRow({ user, onOpenHistory, onEdit, onRestore, onDelete }) {
+  const recordId = getUserRecordId(user);
+  const userId = user?.user_id ?? "-";
+  const isDeleted = !!user?.deleted_at;
+
+  return (
+    <tr onClick={() => onOpenHistory(user)} style={{ cursor: "pointer" }} title="Click to view user history">
+      <td>{userId}</td>
+      <td>{user?.name ?? "-"}</td>
+      <td className="text-break">{user?.email ?? "-"}</td>
+      <td>{user?.phone ?? "-"}</td>
+      <td>{roleBadge(user?.role)}</td>
+      <td>
+        {isDeleted ? (
+          <span className="badge bg-warning text-dark">Deleted</span>
+        ) : (
+          <span className="badge bg-success">Active</span>
+        )}
+      </td>
+
+      <td style={{ verticalAlign: "middle" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            flexWrap: "nowrap",
+            whiteSpace: "nowrap",
+            minHeight: "100%",
+          }}
+        >
+          <button
+            className="btn btn-sm btn-outline-info"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(user);
+            }}
+            disabled={isDeleted}
+            title={isDeleted ? "Restore user first to update" : "Update"}
+            style={{ minWidth: 70 }}
+          >
+            Update
+          </button>
+
+          {isDeleted ? (
+            <button
+              className="btn btn-sm btn-outline-warning"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRestore(recordId ?? userId);
+              }}
+              style={{ minWidth: 70 }}
+            >
+              Restore
+            </button>
+          ) : (
+            <button
+              className="btn btn-sm btn-outline-danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete(recordId ?? userId);
+              }}
+              style={{ minWidth: 70 }}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 export default function AdminUsers() {
   const navigate = useNavigate();
 
@@ -99,6 +228,13 @@ export default function AdminUsers() {
 
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState([]);
+  // Set when the backend returns Laravel-style pagination metadata; when null
+  // the table keeps running in pure client-side mode (previous behaviour).
+  const [serverMeta, setServerMeta] = useState(null);
+
+  // Always keep the latest `load` here so stable (useCallback) row handlers
+  // can trigger a refresh without recreating themselves every render.
+  const loadRef = useRef(null);
   
   // Force disable autofill for search input
   const searchInputRef = React.useRef(null);
@@ -123,33 +259,44 @@ export default function AdminUsers() {
     setCreateForm((prev) => ({ ...prev, user_id: sanitized }));
   };
 
-  const load = async () => {
+  const load = async (options = {}) => {
     setMsg(null);
     setLoading(true);
     try {
-      const res = await axiosClient.get("/users");
-      const list = normalizeList(res.data);
-  
+      const params = {};
+      const term = (options.search ?? query).trim();
+      if (term) params.search = term;
+      // Send pagination hints. If the backend supports them it returns a
+      // paginated envelope and we switch to server mode; if it ignores them
+      // it returns a plain array and we keep working in client mode.
+      params.page = options.page ?? page;
+      params.per_page = pageSize;
+
+      const res = await axiosClient.get("/users", { params });
+      const parsed = parseUsersResponse(res.data);
+      const list = parsed.users;
+
       // 🔍 DEBUG: Check if backend returns database 'id' field
-      console.log("[AdminUsers] Loaded users from API:", list);
       if (list.length > 0) {
         const sampleUser = list[0];
-        console.log("[AdminUsers] Sample user structure:", {
-          id: sampleUser?.id,
-          user_id: sampleUser?.user_id,
-          name: sampleUser?.name,
-          hasDbId: 'id' in sampleUser,
-          hasUserId: 'user_id' in sampleUser,
-        });
-          
-        if (!('id' in sampleUser)) {
+        if (!("id" in sampleUser)) {
           console.error("❌ CRITICAL: Backend /users endpoint does NOT return 'id' field!");
           console.error("❌ This will cause user history mismatch. Backend must return database primary key as 'id'.");
         }
       }
   
       setUsers(list);
-      setPage(1);
+      setServerMeta(
+        parsed.mode === "server"
+          ? {
+              page: parsed.page,
+              perPage: parsed.perPage,
+              total: parsed.total,
+              lastPage: parsed.lastPage,
+            }
+          : null
+      );
+      if (options.resetPage) setPage(1);
     } catch (e) {
       setMsg({
         type: "danger",
@@ -162,10 +309,25 @@ export default function AdminUsers() {
     }
   };
 
+  // Keep the latest `load` reference up to date so stable handlers can use it.
+  useEffect(() => {
+    loadRef.current = load;
+  });
+
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
+  // Server mode: refetch when page / page-size / search change. Debounced so
+  // typing a search term doesn't fire a request per keystroke.
+  useEffect(() => {
+    if (!serverMeta) return undefined;
+    const timer = window.setTimeout(() => load(), 350);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, page, pageSize]);
+
   // Disable autocomplete attribute on mount
   useEffect(() => {
     if (searchInputRef.current) {
@@ -175,6 +337,8 @@ export default function AdminUsers() {
   }, []);
 
   const filtered = useMemo(() => {
+    // Server mode: the backend already filtered + paged the results.
+    if (serverMeta) return users;
     const q = query.trim().toLowerCase();
     if (!q) return users;
     return users.filter((u) => {
@@ -183,15 +347,19 @@ export default function AdminUsers() {
       );
       return vals.some((v) => v.includes(q));
     });
-  }, [users, query]);
+  }, [users, query, serverMeta]);
 
   useEffect(() => setPage(1), [query, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const totalPages = serverMeta
+    ? Math.max(1, Number(serverMeta.lastPage) || 1)
+    : Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = useMemo(() => {
+    // Server mode: rows already paged server-side.
+    if (serverMeta) return users;
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+  }, [serverMeta, users, filtered, page, pageSize]);
 
   const goTo = (p) => setPage(Math.min(Math.max(1, p), totalPages));
 
@@ -239,7 +407,7 @@ export default function AdminUsers() {
   };
 
   // --------- Edit ----------
-  const openEdit = (u) => {
+  const openEdit = useCallback((u) => {
     setMsg(null);
 
     const recordId = getUserRecordId(u);
@@ -262,7 +430,7 @@ export default function AdminUsers() {
     setEditForm(next);
     setEditOriginal(next);
     setShowEdit(true);
-  };
+  }, []);
 
   const closeEdit = () => {
     setShowEdit(false);
@@ -345,7 +513,7 @@ export default function AdminUsers() {
   };
 
   // --------- Delete / Restore ----------
-  const destroy = async (id) => {
+  const destroy = useCallback(async (id) => {
     if (!id) {
       setMsg({ type: "danger", text: "This user is missing a server ID. Please refresh the list." });
       return;
@@ -356,13 +524,13 @@ export default function AdminUsers() {
     try {
       await axiosClient.delete(`/users/${id}/force`);
       setMsg({ type: "success", text: "User deleted successfully." });
-      await load();
+      await loadRef.current?.();
     } catch (e) {
       setMsg({ type: "danger", text: e?.response?.data?.message || "Delete failed." });
     }
-  };
+  }, []);
 
-  const restore = async (id) => {
+  const restore = useCallback(async (id) => {
     if (!id) {
       setMsg({ type: "danger", text: "This user is missing a server ID. Please refresh the list." });
       return;
@@ -371,27 +539,16 @@ export default function AdminUsers() {
     try {
       await axiosClient.post(`/users/${id}/restore`);
       setMsg({ type: "success", text: "User restored." });
-      await load();
+      await loadRef.current?.();
     } catch (e) {
       setMsg({ type: "danger", text: e?.response?.data?.message || "Restore failed." });
     }
-  };
+  }, []);
 
-  const openHistory = (u) => {
+  const openHistory = useCallback((u) => {
     const recordId = getUserRecordId(u);
     const userRole = String(u?.role || "").toLowerCase();
-    
-    console.log("[AdminUsers] Opening history for user:", u);
-    console.log("[AdminUsers] Extracted recordId:", recordId);
-    console.log("[AdminUsers] User role:", userRole);
-    console.log("[AdminUsers] User object details:", {
-      id: u?.id,
-      user_id: u?.user_id,
-      name: u?.name,
-      email: u?.email,
-      role: u?.role,
-    });
-    
+
     if (!recordId) {
       setMsg({ type: "danger", text: "This user is missing a users.id value. Please refresh the list." });
       return;
@@ -403,7 +560,7 @@ export default function AdminUsers() {
     } else {
       navigate(`/admin/users/${recordId}/history`, { state: { user: u } });
     }
-  };
+  }, [navigate]);
 
   return (
     <div className="admin-card p-4">
@@ -494,82 +651,16 @@ export default function AdminUsers() {
               </tr>
             ) : (
               pageItems.map((u) => {
-                const recordId = getUserRecordId(u);
-                const userId = u?.user_id ?? "-";
                 const rowKey = getStableRowKey(u); // ✅ FIXED KEY
-                const isDeleted = !!u?.deleted_at;
-
                 return (
-                  <tr
+                  <UserRow
                     key={rowKey}
-                    onClick={() => openHistory(u)}
-                    style={{ cursor: "pointer" }}
-                    title="Click to view user history"
-                  >
-                    <td>{userId}</td>
-                    <td>{u?.name ?? "-"}</td>
-                    <td className="text-break">{u?.email ?? "-"}</td>
-                    <td>{u?.phone ?? "-"}</td>
-                    <td>{roleBadge(u?.role)}</td>
-                    <td>
-                      {isDeleted ? (
-                        <span className="badge bg-warning text-dark">Deleted</span>
-                      ) : (
-                        <span className="badge bg-success">Active</span>
-                      )}
-                    </td>
-
-                    <td style={{ verticalAlign: "middle" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "8px",
-                          flexWrap: "nowrap",
-                          whiteSpace: "nowrap",
-                          minHeight: "100%",
-                        }}
-                      >
-                        <button
-                          className="btn btn-sm btn-outline-info"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openEdit(u);
-                          }}
-                          disabled={isDeleted}
-                          title={isDeleted ? "Restore user first to update" : "Update"}
-                          style={{ minWidth: 70 }}
-                        >
-                          Update
-                        </button>
-
-                        {isDeleted ? (
-                          <button
-                            className="btn btn-sm btn-outline-warning"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              restore(recordId ?? userId);
-                            }}
-                            style={{ minWidth: 70 }}
-                          >
-                            Restore
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              destroy(recordId ?? userId);
-                            }}
-                            style={{ minWidth: 70 }}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                    user={u}
+                    onOpenHistory={openHistory}
+                    onEdit={openEdit}
+                    onRestore={restore}
+                    onDelete={destroy}
+                  />
                 );
               })
             )}

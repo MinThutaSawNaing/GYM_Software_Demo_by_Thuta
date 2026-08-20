@@ -21,14 +21,6 @@ function formatDateTimeVideoStyle(s) {
   return formatDateTimeDDMMYYYY(d);
 }
 
-function normalizeRole(role) {
-  const r = String(role || "").toLowerCase();
-  if (r === "trainer") return "Trainer";
-  if (r === "user") return "User";
-  if (r === "admin" || r === "administrator") return "Admin";
-  return role || "-";
-}
-
 function roleBadge(role) {
   const r = String(role || "").toLowerCase();
   if (r === "trainer") return <span className="badge bg-info text-dark">Trainer</span>;
@@ -336,6 +328,7 @@ export default function AdminAttendance() {
   useEffect(() => {
     if (activeTab !== "checked") return undefined;
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       loadCheckedIn(false);
       loadActiveCheckins(false);
       loadMemberCount(false);

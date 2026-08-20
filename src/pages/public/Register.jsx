@@ -66,7 +66,7 @@ export default function Register() {
           <div className="login-icon">
             <i className="bi bi-activity"></i>
           </div>
-          <h4 className="login-title">Welcome to UNITY FITNESS</h4>
+          <h4 className="login-title">Welcome to Winter Arc Software</h4>
           <p className="glass-subtitle">Create your account</p>
         </div>
 
