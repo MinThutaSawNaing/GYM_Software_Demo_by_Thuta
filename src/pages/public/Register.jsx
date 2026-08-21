@@ -12,16 +12,16 @@ export default function Register() {
 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [captchaHtml, setCaptchaHtml] = useState("");
+  const [captchaImage, setCaptchaImage] = useState("");
 
   const loadCaptcha = async () => {
     const res = await axiosClient.get("/captcha");
-    setCaptchaHtml(res.data?.captcha || "");
+    setCaptchaImage(res.data?.captcha || res.data?.img || "");
   };
 
   const refreshCaptcha = async () => {
     const res = await axiosClient.get("/captcha/refresh");
-    setCaptchaHtml(res.data?.captcha || "");
+    setCaptchaImage(res.data?.captcha || res.data?.img || "");
   };
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function Register() {
       <div className="glass-card p-4 w-100" style={{ maxWidth: 520 }}>
         <div className="mb-4">
           <div className="login-icon">
-            <i className="bi bi-activity"></i>
+            <img src="/winter-arc-logo.png" alt="Winter Arc Software logo" className="login-logo" />
           </div>
           <h4 className="login-title">Welcome to Winter Arc Software</h4>
           <p className="glass-subtitle">Create your account</p>
@@ -149,10 +149,9 @@ export default function Register() {
           <div className="mt-3 mb-3">
             <label className="form-label">Captcha</label>
             <div className="captcha-box d-flex align-items-center gap-2">
-              <div
-                className="captcha-img flex-grow-1"
-                dangerouslySetInnerHTML={{ __html: captchaHtml }}
-              />
+              <div className="captcha-img flex-grow-1">
+                {captchaImage && <img src={captchaImage} alt="captcha" />}
+              </div>
               <button
                 type="button"
                 className="btn btn-outline-light"

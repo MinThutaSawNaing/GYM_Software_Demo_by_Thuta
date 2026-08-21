@@ -23,10 +23,7 @@ export default function Loading({
       role="status"
       aria-label={text}
     >
-      <span className="page-loading-ring" />
-      <span className="page-loading-ring page-loading-ring-2" />
-      <span className="page-loading-ring page-loading-ring-3" />
-      <span className="page-loading-core" />
+      <i className="bi bi-snow3 page-loading-logo" aria-hidden="true" />
     </div>
   );
 
