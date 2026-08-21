@@ -9,35 +9,45 @@ export default function Login() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [captcha, setCaptcha] = useState("");
+  const [captchaImage, setCaptchaImage] = useState("");
+  const [captchaKey, setCaptchaKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  // Captcha served from backend route
-  const backendUrl =
-    import.meta.env.VITE_BACKEND_URL || "https://api.unityfitnessmyanmar.online/api";
+  const loadCaptcha = async (refresh = false) => {
+    setCaptchaKey("");
+    const res = await axiosClient.get(refresh ? "/captcha/refresh" : "/captcha");
+    const image = res.data?.captcha || res.data?.img;
+    const key = res.data?.captcha_key || res.data?.key;
 
-  // Start with empty, set once in useEffect to avoid extra request during render
-  const [captchaUrl, setCaptchaUrl] = useState("");
+    if (!image || !key) throw new Error("Invalid captcha response");
 
-  const refreshCaptcha = () => {
-    // Prevent refresh while submitting (avoids canceled requests / mismatch)
-    if (loading) return;
+    setCaptchaImage(image);
+    setCaptchaKey(key);
+  };
 
-    // Clear the input because new captcha will be generated
+  const refreshCaptcha = async () => {
     setCaptcha("");
-
-    // Bust cache to always get a fresh captcha
-    setCaptchaUrl(`${backendUrl}/captcha?ts=${Date.now()}`);
+    try {
+      await loadCaptcha(true);
+    } catch {
+      setMsg("Unable to refresh captcha. Please try again.");
+    }
   };
 
   useEffect(() => {
-    refreshCaptcha();
+    loadCaptcha().catch(() => setMsg("Unable to load captcha. Please refresh and try again."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg(null);
+
+    if (!captchaKey) {
+      setMsg("Captcha is loading. Please try again.");
+      return;
+    }
 
     // Basic guard: don’t submit without captcha
     if (!captcha || captcha.trim().length === 0) {
@@ -52,6 +62,7 @@ export default function Login() {
         identifier,
         password,
         captcha: captcha.trim(),
+        captcha_key: captchaKey,
       });
 
       const token = res?.data?.token;
@@ -75,15 +86,16 @@ export default function Login() {
       }
     } catch (err) {
       // show server message if present
+      const captchaErrors = err?.response?.data?.errors?.captcha;
       const serverMsg =
+        (Array.isArray(captchaErrors) && captchaErrors.join(" ")) ||
         err?.response?.data?.message ||
-        err?.response?.data?.errors?.captcha?.[0] ||
         "Login failed.";
 
       setMsg(serverMsg);
 
-      // On failure, refresh captcha (new challenge)
-      refreshCaptcha();
+      // Replace the image and server-issued key together after a failed login.
+      await refreshCaptcha();
     } finally {
       setLoading(false);
     }
@@ -94,7 +106,7 @@ export default function Login() {
       <div className="glass-card p-4 w-100" style={{ maxWidth: 520 }}>
         <div className="mb-4">
           <div className="login-icon">
-            <img src="/UNITY%20LOGO.jpg" alt="Unity Fitness logo" className="login-logo" />
+            <img src="/winter-arc-logo.png" alt="Winter Arc Software logo" className="login-logo" />
           </div>
           <h4 className="login-title">Welcome to Winter Arc Software</h4>
           <p className="glass-subtitle">Sign in to continue</p>
@@ -131,8 +143,8 @@ export default function Login() {
 
             <div className="captcha-box d-flex align-items-center gap-2">
               <div className="captcha-img flex-grow-1">
-                {captchaUrl ? (
-                  <img src={captchaUrl} alt="captcha" />
+                {captchaImage ? (
+                  <img src={captchaImage} alt="captcha" />
                 ) : (
                   <div style={{ height: 48 }} />
                 )}
@@ -160,7 +172,7 @@ export default function Login() {
             />
           </div>
 
-          <button className="btn btn-primary w-100" disabled={loading}>
+          <button className="btn btn-primary w-100" disabled={loading || !captchaKey}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
 
