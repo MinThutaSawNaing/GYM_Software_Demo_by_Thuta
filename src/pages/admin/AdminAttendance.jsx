@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axiosClient from "../../api/axiosClient";
-import { scanRfidAttendance } from "../../api/attendanceApi";
+import {
+  ATTENDANCE_SCAN_CONTROL_STORAGE_KEY,
+  getAttendanceScanControlStatus,
+  saveAttendanceScanControlLocal,
+  scanMemberCardAttendance,
+  setAttendanceScanControlStatus,
+} from "../../api/attendanceApi";
 import Loading from "../../components/Loading";
 import RfidInputListener from "../../components/RfidInputListener";
 import { isCardNotRegisteredError, normalizeCardId } from "../../utils/rfid";
@@ -19,6 +25,14 @@ function formatDateTimeVideoStyle(s) {
   const d = parseBackendDateTime(s);
   if (!d) return "-";
   return formatDateTimeDDMMYYYY(d);
+}
+
+function normalizeRole(role) {
+  const r = String(role || "").toLowerCase();
+  if (r === "trainer") return "Trainer";
+  if (r === "user") return "User";
+  if (r === "admin" || r === "administrator") return "Admin";
+  return role || "-";
 }
 
 function roleBadge(role) {
@@ -164,14 +178,14 @@ const glassSelectStyle = {
   border: "1px solid rgba(255,255,255,0.18)",
 };
 
-const SCAN_COOLDOWN_MS = 1500;
+const SCAN_COOLDOWN_MS = 4000;
 
 export default function AdminAttendance() {
   const [activeTab, setActiveTab] = useState("records"); // records | checked
   const [msg, setMsg] = useState(null);
   const scanInputRef = useRef(null);
   const scanTimeoutRef = useRef(null);
-  const cardCooldownsRef = useRef(new Map());
+  const lastScanAttemptRef = useRef(0);
 
   // Records
   const [recordsLoading, setRecordsLoading] = useState(false);
@@ -182,9 +196,11 @@ export default function AdminAttendance() {
 
   // Member card scan panel
   const [scanValue, setScanValue] = useState("");
-  const [activeScanCount, setActiveScanCount] = useState(0);
+  const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState(null);
   const [scanResult, setScanResult] = useState(null);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [scanControlSyncing, setScanControlSyncing] = useState(false);
 
   // Checked-in
   const [checkedLoading, setCheckedLoading] = useState(false);
@@ -196,9 +212,6 @@ export default function AdminAttendance() {
   const showError = (text) => {
     setMsg({ type: "danger", text });
   };
-
-  const scanLoading = activeScanCount > 0;
-  const scannerActive = true;
 
   // ---------------- API calls ----------------
 
@@ -326,9 +339,44 @@ export default function AdminAttendance() {
   }, [activeTab]);
 
   useEffect(() => {
+    let alive = true;
+
+    const loadScanControl = async () => {
+      try {
+        const res = await getAttendanceScanControlStatus();
+        if (!alive) return;
+        setScannerActive(!!res?.isActive);
+      } catch {
+        if (!alive) return;
+      }
+    };
+
+    loadScanControl();
+
+    const intervalId = window.setInterval(loadScanControl, 10000);
+
+    const onStorage = (event) => {
+      if (event.key !== ATTENDANCE_SCAN_CONTROL_STORAGE_KEY) return;
+      try {
+        const next = event.newValue ? JSON.parse(event.newValue) : null;
+        setScannerActive(!!next?.isActive);
+      } catch {
+        setScannerActive(false);
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     if (activeTab !== "checked") return undefined;
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
       loadCheckedIn(false);
       loadActiveCheckins(false);
       loadMemberCount(false);
@@ -407,7 +455,17 @@ export default function AdminAttendance() {
   }, [records]);
 
   const handleScanSubmit = async (rawValue) => {
-    if (!scannerActive) return;
+    if (!scannerActive || scanLoading) return;
+    const now = Date.now();
+    const sinceLast = now - lastScanAttemptRef.current;
+    if (lastScanAttemptRef.current && sinceLast < SCAN_COOLDOWN_MS) {
+      const secondsLeft = Math.ceil((SCAN_COOLDOWN_MS - sinceLast) / 1000);
+      setScanError(`Please wait ${secondsLeft} second${secondsLeft === 1 ? "" : "s"} before scanning again.`);
+      setScanValue("");
+      setTimeout(() => scanInputRef.current?.focus(), 0);
+      return;
+    }
+    lastScanAttemptRef.current = now;
 
     const cardId = normalizeCardId(rawValue);
     if (!cardId) {
@@ -415,22 +473,11 @@ export default function AdminAttendance() {
       return;
     }
 
-    const lockUntil = cardCooldownsRef.current.get(cardId) ?? 0;
-    const msRemaining = lockUntil - Date.now();
-    if (msRemaining > 0) {
-      const secondsLeft = Math.ceil(msRemaining / 1000);
-      setScanError(`Please wait ${secondsLeft} second${secondsLeft === 1 ? "" : "s"} before scanning this card again.`);
-      setScanValue("");
-      setTimeout(() => scanInputRef.current?.focus(), 0);
-      return;
-    }
-    cardCooldownsRef.current.set(cardId, Date.now() + SCAN_COOLDOWN_MS);
-
-    setActiveScanCount((count) => count + 1);
+    setScanLoading(true);
     setScanError(null);
 
     try {
-      const res = await scanRfidAttendance(cardId);
+      const res = await scanMemberCardAttendance(cardId);
       const payload = res?.data ?? {};
       const { user, attendance, message } = extractScanPayload(payload);
 
@@ -463,11 +510,12 @@ export default function AdminAttendance() {
         setScanError(message);
       }
     } finally {
-      setActiveScanCount((count) => Math.max(0, count - 1));
+      setScanLoading(false);
     }
   };
 
   const handleScanChange = (event) => {
+    if (!scannerActive) return;
     const value = event.target.value;
     setScanValue(value);
     setScanError(null);
@@ -491,6 +539,7 @@ export default function AdminAttendance() {
     setScanValue("");
     setScanResult(null);
     setScanError(null);
+    setScanLoading(false);
     if (scanInputRef.current) {
       scanInputRef.current.focus();
     }
@@ -506,12 +555,12 @@ export default function AdminAttendance() {
           Attendance Center
         </h4>
         <div className="admin-muted" style={mutedText}>
-          Scan member RFID cards and monitor active gym users.
+          Track attendance by RFID scan and monitor active gym users.
         </div>
       </div>
 
       <RfidInputListener
-        active
+        active={scannerActive && !scanLoading}
         onScan={(value) => {
           setScanValue(value);
           handleScanSubmit(value);
@@ -524,11 +573,69 @@ export default function AdminAttendance() {
               <div style={{ fontWeight: 700, fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
                 Member Card Scan
               </div>
-              <div style={{ fontSize: 13, ...mutedText }}>Scan a member card to send it directly to the RFID attendance endpoint.</div>
+              <div style={{ fontSize: 13, ...mutedText }}>Admin can start/stop scanner control for member attendance.</div>
             </div>
             <span className={`badge ${scanLoading ? "bg-warning text-dark" : "bg-success"}`}>
-              {scanLoading ? "Scanning..." : "Ready"}
+              {scanControlSyncing ? "Syncing..." : scanLoading ? "Scanning..." : scannerActive ? "Scanner ON" : "Scanner OFF"}
             </span>
+          </div>
+
+          <div className="d-flex gap-2 mb-3">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-light"
+              onClick={async () => {
+                setScanControlSyncing(true);
+                try {
+                  const res = await setAttendanceScanControlStatus(true);
+                  const newState = !!res?.isActive;
+                  setScannerActive(newState);
+                  saveAttendanceScanControlLocal(newState);
+                  console.log("[Admin] Scanner started:", newState);
+                  setScanError(null);
+                  setScanResult(null);
+                  setTimeout(() => scanInputRef.current?.focus(), 0);
+                } catch (e) {
+                  // Even if API fails, save locally and update UI
+                  setScannerActive(true);
+                  saveAttendanceScanControlLocal(true);
+                  console.log("[Admin] Scanner started (local only): true");
+                  setScanError(null);
+                } finally {
+                  setScanControlSyncing(false);
+                }
+              }}
+              disabled={scannerActive || scanLoading || scanControlSyncing}
+            >
+              Start Scan
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-light"
+              onClick={async () => {
+                setScanControlSyncing(true);
+                try {
+                  const res = await setAttendanceScanControlStatus(false);
+                  const newState = !!res?.isActive;
+                  setScannerActive(newState);
+                  saveAttendanceScanControlLocal(newState);
+                  console.log("[Admin] Scanner stopped:", newState);
+                  setScanValue("");
+                  setScanError(null);
+                } catch (e) {
+                  // Even if API fails, save locally and update UI
+                  setScannerActive(false);
+                  saveAttendanceScanControlLocal(false);
+                  console.log("[Admin] Scanner stopped (local only): false");
+                  setScanError(null);
+                } finally {
+                  setScanControlSyncing(false);
+                }
+              }}
+              disabled={!scannerActive || scanControlSyncing}
+            >
+              Stop Scan
+            </button>
           </div>
 
           <input
@@ -538,8 +645,9 @@ export default function AdminAttendance() {
             value={scanValue}
             onChange={handleScanChange}
             onKeyDown={handleScanKeyDown}
-            placeholder="Scan member card ID"
+            placeholder={scannerActive ? "Scan member card ID" : "Click Start Scan to enable reader"}
             autoComplete="off"
+            disabled={!scannerActive || scanLoading}
           />
 
           {scanError && (
@@ -556,7 +664,7 @@ export default function AdminAttendance() {
               <div style={{ fontWeight: 700, fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
                 Latest Scan Result
               </div>
-              <div style={{ fontSize: 13, ...mutedText }}>Each valid card scan is sent directly to the RFID attendance endpoint.</div>
+              <div style={{ fontSize: 13, ...mutedText }}>Scanner stays active and records each valid member card scan.</div>
             </div>
             <span className="badge bg-success">Success</span>
           </div>
