@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import useRealtimePolling from "../../hooks/useRealtimePolling";
+import Loading from "../../components/Loading";
 
 import {
   ResponsiveContainer,
@@ -198,7 +199,11 @@ const cardGlass = {
 const titleText = { color: "rgba(255,255,255,0.92)" };
 const mutedText = { color: "rgba(255,255,255,0.60)" };
 
-const MetricAreaChart = React.memo(function MetricAreaChart({ title, data, stroke, fill }) {
+const Skeleton = ({ width = "100%", height = 16 }) => (
+  <div className="loading-skeleton" style={{ width, height }} aria-hidden="true" />
+);
+
+const MetricAreaChart = React.memo(function MetricAreaChart({ title, data, stroke, fill, loading, error }) {
   return (
     <div className="p-3 mb-3" style={{ ...cardGlass, background: "rgba(255,255,255,0.06)" }}>
       <div className="d-flex justify-content-between align-items-center mb-2">
@@ -209,21 +214,29 @@ const MetricAreaChart = React.memo(function MetricAreaChart({ title, data, strok
       </div>
 
       <div style={{ width: "100%", height: 130 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 10 }} />
-            <YAxis stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 10 }} />
-            <Tooltip
-              contentStyle={{
-                background: "rgba(0,0,0,0.85)",
-                border: "1px solid rgba(255,255,255,0.15)",
-              }}
-              labelStyle={{ color: "#fff" }}
-            />
-            <Area type="monotone" dataKey="value" stroke={stroke} fill={fill} strokeWidth={2} isAnimationActive={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+        {loading ? (
+          <Skeleton height={130} />
+        ) : error ? (
+          <div className="h-100 d-flex align-items-center justify-content-center small" style={mutedText}>
+            Chart unavailable
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey="name" stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 10 }} />
+              <YAxis stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 10 }} />
+              <Tooltip
+                contentStyle={{
+                  background: "rgba(0,0,0,0.85)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                }}
+                labelStyle={{ color: "#fff" }}
+              />
+              <Area type="monotone" dataKey="value" stroke={stroke} fill={fill} strokeWidth={2} isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
@@ -232,6 +245,14 @@ const MetricAreaChart = React.memo(function MetricAreaChart({ title, data, strok
 export default function AdminDashboard() {
   const [msg, setMsg] = useState(null);
   const [report, setReport] = useState({});
+  const [reportLoading, setReportLoading] = useState(true);
+  const [growthLoading, setGrowthLoading] = useState(true);
+  const [reportLoaded, setReportLoaded] = useState(false);
+  const [growthLoaded, setGrowthLoaded] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [growthError, setGrowthError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [exporting, setExporting] = useState(null);
 
   // ✅ chart series states (from /api/dashboard/growth-summary)
   const [usersGrowthData, setUsersGrowthData] = useState([]);
@@ -249,8 +270,9 @@ export default function AdminDashboard() {
     return () => abortRef.current?.abort?.();
   }, []);
 
-  const loadReport = async () => {
-    setMsg(null);
+  const loadReport = async ({ silent = false } = {}) => {
+    if (!silent) setReportLoading(true);
+    setReportError("");
 
     try {
       const res = await axiosClient.get(API.ATTENDANCE_REPORT, {
@@ -260,18 +282,22 @@ export default function AdminDashboard() {
 
       const payload = normalizeReportPayload(res?.data);
       setReport(payload || {});
+      setReportLoaded(true);
+      setLastUpdated(new Date());
     } catch (e) {
       if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
 
-      setMsg({
-        type: "danger",
-        text: e?.response?.data?.message || "Failed to load dashboard report.",
-      });
+      setReportError(e?.response?.data?.message || "Failed to load dashboard report.");
+    } finally {
+      if (!silent) setReportLoading(false);
     }
   };
 
   // ✅ uses your new backend endpoint
-  const loadGrowthSeries = async (months = 6) => {
+  const loadGrowthSeries = async (months = 6, { silent = false } = {}) => {
+    if (!silent) setGrowthLoading(true);
+    setGrowthError("");
+
     try {
       const res = await axiosClient.get(API.GROWTH_SUMMARY, {
         params: { months },
@@ -320,13 +346,14 @@ export default function AdminDashboard() {
       setSubscriptionsData((prev) => (hasDataChanged(prev, nextSubscriptions) ? nextSubscriptions : prev));
       setTrainerBookingsData((prev) => (hasDataChanged(prev, nextTrainerBookings) ? nextTrainerBookings : prev));
       setBoxingBookingsData((prev) => (hasDataChanged(prev, nextBoxingBookings) ? nextBoxingBookings : prev));
+      setGrowthLoaded(true);
+      setLastUpdated(new Date());
     } catch (e) {
       if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
 
-      setMsg({
-        type: "warning",
-        text: e?.response?.data?.message || "Failed to load growth graphs (/api/dashboard/growth-summary).",
-      });
+      setGrowthError(e?.response?.data?.message || "Failed to load growth graphs.");
+    } finally {
+      if (!silent) setGrowthLoading(false);
     }
   };
 
@@ -338,7 +365,6 @@ export default function AdminDashboard() {
     // synchronously (react-hooks/set-state-in-effect).
     const t = window.setTimeout(() => {
       loadReport();
-      loadGrowthSeries(6);
     }, 0);
 
     return () => window.clearTimeout(t);
@@ -347,7 +373,7 @@ export default function AdminDashboard() {
   // ✅ optional polling for "real-time" (visibility-aware: pauses while the tab
   // is hidden, never overlaps an in-flight request, and only re-renders when
   // the data actually changed — see hasDataChanged guard in loadGrowthSeries).
-  useRealtimePolling(() => loadGrowthSeries(6), POLL_GROWTH_EVERY_MS, []);
+  useRealtimePolling((options) => loadGrowthSeries(6, options), POLL_GROWTH_EVERY_MS, []);
 
   // metrics from attendance report
   const metrics = useMemo(() => {
@@ -414,6 +440,8 @@ export default function AdminDashboard() {
   };
 
   const exportExcel = async () => {
+    if (exporting) return;
+    setExporting("excel");
     setMsg(null);
     try {
       const res = await axiosClient.get(API.EXPORT_EXCEL, {
@@ -440,10 +468,14 @@ export default function AdminDashboard() {
     } catch (e) {
       const serverMsg = e?.response?.data?.message || (await decodeBlobErrorMessage(e));
       setMsg({ type: "danger", text: serverMsg || "Export failed (excel)." });
+    } finally {
+      setExporting(null);
     }
   };
 
   const exportJson = async () => {
+    if (exporting) return;
+    setExporting("json");
     setMsg(null);
     try {
       const res = await axiosClient.get(API.EXPORT_JSON, {
@@ -470,7 +502,14 @@ export default function AdminDashboard() {
     } catch (e) {
       const serverMsg = e?.response?.data?.message || "Export failed (json).";
       setMsg({ type: "danger", text: serverMsg });
+    } finally {
+      setExporting(null);
     }
+  };
+
+  const metricValue = (value) => {
+    if (reportLoading && !reportLoaded) return <Skeleton width={72} height={34} />;
+    return reportError && !reportLoaded ? "—" : value;
   };
 
   return (
@@ -482,18 +521,49 @@ export default function AdminDashboard() {
             Dashboard
           </h4>
           <div style={mutedText}>Attendance report overview and growth graphs.</div>
+          <div className="small mt-1" style={mutedText} role="status" aria-live="polite">
+            {lastUpdated
+              ? `Last updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+              : reportLoading || growthLoading
+                ? "Loading latest data…"
+                : "Dashboard data unavailable"}
+          </div>
         </div>
 
       </div>
 
-      {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
+      {msg && (
+        <div className={`alert alert-${msg.type}`} role={msg.type === "danger" ? "alert" : "status"}>
+          {msg.text}
+        </div>
+      )}
+
+      {reportError && (
+        <div className="alert alert-danger d-flex flex-wrap align-items-center justify-content-between gap-2" role="alert">
+          <span>{reportError}</span>
+          <button className="btn btn-sm btn-outline-light" onClick={() => loadReport()} disabled={reportLoading}>
+            {reportLoading ? <Loading inline size={16} text="Retrying report" /> : "Retry report"}
+          </button>
+        </div>
+      )}
+
+      {growthError && (
+        <div className="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2" role="alert">
+          <span>{growthError}</span>
+          <button className="btn btn-sm btn-outline-dark" onClick={() => loadGrowthSeries(6)} disabled={growthLoading}>
+            {growthLoading ? <Loading inline size={16} text="Retrying charts" /> : "Retry charts"}
+          </button>
+        </div>
+      )}
 
       {/* Top cards */}
       <div className="row g-3 mb-3">
         <div className="col-12 col-md-6 col-xl-3">
           <div className="p-3" style={cardGlass}>
             <div style={mutedText}>Total Members</div>
-            <div style={{ ...titleText, fontSize: 28, fontWeight: 700 }}>{metrics.totalMembers}</div>
+            <div className="d-flex align-items-center" style={{ ...titleText, minHeight: 42, fontSize: 28, fontWeight: 700 }}>
+              {metricValue(metrics.totalMembers)}
+            </div>
             <div className="small" style={mutedText}>
               All registered gym members
             </div>
@@ -503,7 +573,9 @@ export default function AdminDashboard() {
         <div className="col-12 col-md-6 col-xl-3">
           <div className="p-3" style={cardGlass}>
             <div style={mutedText}>Active Check-ins</div>
-            <div style={{ ...titleText, fontSize: 28, fontWeight: 700 }}>{metrics.activeCheckins}</div>
+            <div className="d-flex align-items-center" style={{ ...titleText, minHeight: 42, fontSize: 28, fontWeight: 700 }}>
+              {metricValue(metrics.activeCheckins)}
+            </div>
             <div className="small" style={mutedText}>
               Currently inside (checked-in)
             </div>
@@ -513,7 +585,9 @@ export default function AdminDashboard() {
         <div className="col-12 col-md-6 col-xl-3">
           <div className="p-3" style={cardGlass}>
             <div style={mutedText}>Today Check-in</div>
-            <div style={{ ...titleText, fontSize: 28, fontWeight: 700 }}>{metrics.todayCheckins}</div>
+            <div className="d-flex align-items-center" style={{ ...titleText, minHeight: 42, fontSize: 28, fontWeight: 700 }}>
+              {metricValue(metrics.todayCheckins)}
+            </div>
             <div className="small" style={mutedText}>
               Scans recorded today (in)
             </div>
@@ -523,7 +597,9 @@ export default function AdminDashboard() {
         <div className="col-12 col-md-6 col-xl-3">
           <div className="p-3" style={cardGlass}>
             <div style={mutedText}>Today Check-out</div>
-            <div style={{ ...titleText, fontSize: 28, fontWeight: 700 }}>{metrics.todayCheckouts}</div>
+            <div className="d-flex align-items-center" style={{ ...titleText, minHeight: 42, fontSize: 28, fontWeight: 700 }}>
+              {metricValue(metrics.todayCheckouts)}
+            </div>
             <div className="small" style={mutedText}>
               Scans recorded today (out)
             </div>
@@ -539,12 +615,16 @@ export default function AdminDashboard() {
             data={usersGrowthData}
             stroke="#60a5fa"
             fill="rgba(96,165,250,0.22)"
+            loading={growthLoading && !growthLoaded}
+            error={growthError && !growthLoaded}
           />
           <MetricAreaChart
             title="Memberships"
             data={subscriptionsData}
             stroke="#34d399"
             fill="rgba(52,211,153,0.20)"
+            loading={growthLoading && !growthLoaded}
+            error={growthError && !growthLoaded}
           />
         </div>
 
@@ -560,23 +640,31 @@ export default function AdminDashboard() {
             </div>
 
             <div style={{ width: "100%", height: 280 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={attendanceBarData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                  <XAxis dataKey="label" stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 12 }} />
-                  <YAxis stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(0,0,0,0.85)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                    }}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Legend />
-                  <Bar dataKey="check_in" name="Check-ins" fill="#60a5fa" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-                  <Bar dataKey="check_out" name="Check-outs" fill="#fbbf24" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-                </BarChart>
-              </ResponsiveContainer>
+              {reportLoading && !reportLoaded ? (
+                <Skeleton height={280} />
+              ) : reportError && !reportLoaded ? (
+                <div className="h-100 d-flex align-items-center justify-content-center" style={mutedText}>
+                  Attendance chart unavailable
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={attendanceBarData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="label" stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 12 }} />
+                    <YAxis stroke="rgba(255,255,255,0.55)" tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(0,0,0,0.85)",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                      }}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Legend />
+                    <Bar dataKey="check_in" name="Check-ins" fill="#60a5fa" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="check_out" name="Check-outs" fill="#fbbf24" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
 
           </div>
@@ -590,6 +678,8 @@ export default function AdminDashboard() {
             data={trainerBookingsData}
             stroke="#fb923c"
             fill="rgba(251,146,60,0.20)"
+            loading={growthLoading && !growthLoaded}
+            error={growthError && !growthLoaded}
           />
         </div>
         <div className="col-12 col-md-6">
@@ -598,6 +688,8 @@ export default function AdminDashboard() {
             data={boxingBookingsData}
             stroke="#a78bfa"
             fill="rgba(167,139,250,0.22)"
+            loading={growthLoading && !growthLoaded}
+            error={growthError && !growthLoaded}
           />
         </div>
       </div>
@@ -615,11 +707,15 @@ export default function AdminDashboard() {
           </div>
 
           <div className="d-flex flex-wrap gap-2">
-            <button className="btn btn-outline-light" onClick={exportExcel}>
-              Export Excel
+            <button className="btn btn-outline-light" onClick={exportExcel} disabled={Boolean(exporting)}>
+              {exporting === "excel" ? (
+                <><Loading inline size={16} text="Exporting Excel" /> Exporting…</>
+              ) : "Export Excel"}
             </button>
-            <button className="btn btn-outline-light" onClick={exportJson}>
-              Export JSON
+            <button className="btn btn-outline-light" onClick={exportJson} disabled={Boolean(exporting)}>
+              {exporting === "json" ? (
+                <><Loading inline size={16} text="Exporting JSON" /> Exporting…</>
+              ) : "Export JSON"}
             </button>
           </div>
         </div>

@@ -618,16 +618,18 @@ export default function TrainerBooking() {
                           <span style={{ opacity: 0.8 }}>Package type</span>
                           <span>{packageType}</span>
                         </div>
-                        <div className="d-flex justify-content-between">
-                          <span style={{ opacity: 0.8 }}>Count</span>
-                          <span>
-                            {totalSessions === null && remainingSessions !== null
-                              ? `${remainingSessions} / —`
-                              : totalSessions === null
-                              ? b?.sessions_count ?? "—"
-                              : `${remainingSessions ?? "—"} / ${totalSessions}`}
-                          </span>
-                        </div>
+                        {!isMonthlyPackage && (
+                          <div className="d-flex justify-content-between">
+                            <span style={{ opacity: 0.8 }}>Count</span>
+                            <span>
+                              {totalSessions === null && remainingSessions !== null
+                                ? `${remainingSessions} / —`
+                                : totalSessions === null
+                                ? b?.sessions_count ?? "—"
+                                : `${remainingSessions ?? "—"} / ${totalSessions}`}
+                            </span>
+                          </div>
+                        )}
                         <div className="d-flex justify-content-between">
                           <span style={{ opacity: 0.8 }}>Status</span>
                           <span>{String(displayStatus || "—")}</span>

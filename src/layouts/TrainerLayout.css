@@ -1,11 +1,20 @@
-/* DARK BLURRED BACKGROUND */
 .trainer-shell {
-  min-height: 100vh;
-  height: 100vh;
+  --trainer-bg: #020617;
+  --trainer-surface: #0f172a;
+  --trainer-surface-2: #162033;
+  --trainer-border: #26354d;
+  --trainer-text: #f8fafc;
+  --trainer-muted: #a9b5c7;
+  --trainer-accent: #22c55e;
+  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(180deg, #171a21 0%, #0d1117 100%);
+  color: var(--trainer-text);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(34, 197, 94, 0.12), transparent 32%),
+    linear-gradient(180deg, #0a1222 0%, var(--trainer-bg) 70%);
 }
 
 .trainer-scrollbar {
@@ -13,125 +22,112 @@
   min-height: 0;
 }
 
-/* CONTENT AREA */
 .trainer-content {
   flex: 1;
   padding: 16px;
-
-  /* ✅ prevent content from hiding behind bottom nav + safe area */
-  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  padding-bottom: calc(108px + env(safe-area-inset-bottom));
 }
 
-/* GLASS CARD STYLE (exclude page-transition wrapper) */
-.trainer-content > div:not(.page-transition) {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f1f1f1;
-}
-
-/* Ensure content inside page-transition still preserves its own card styles */
-.trainer-content > .page-transition > div {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f1f1f1;
-}
-
-/* HEADINGS */
 .trainer-content h2 {
-  margin-bottom: 8px;
-  color: #ffffff;
+  color: var(--trainer-text);
 }
 
-/* PARAGRAPHS */
 .trainer-content p {
-  color: #d0d0d0;
+  color: var(--trainer-muted);
 }
 
-/* ===========================
-   ✅ BEAUTIFUL MOBILE BOTTOM NAV
-   =========================== */
 .trainer-bottom-nav {
   position: fixed;
-
-  /* ✅ safe-area aware bottom spacing (iPhone notch/home bar) */
   bottom: calc(12px + env(safe-area-inset-bottom));
   left: 12px;
   right: 12px;
-
-  height: 68px;
-  border-radius: 18px;
-
+  z-index: 50;
+  height: 72px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  padding: 8px 10px;
-
-  background: linear-gradient(
-    180deg,
-    rgba(24, 26, 32, 0.92),
-    rgba(12, 13, 16, 0.92)
-  );
-
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-
-  z-index: 9999;
+  border: 1px solid var(--trainer-border);
+  border-radius: 22px;
+  background: rgba(10, 18, 34, 0.96);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
 }
 
-/* NAV ITEMS (icon on top, label below) */
 .nav-item {
   flex: 1;
+  min-width: 48px;
   height: 100%;
-
   display: flex;
-  flex-direction: column; /* ✅ THIS FIXES ALIGNMENT */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-
+  color: #a9b5c7;
+  border: 1px solid transparent;
+  border-radius: 16px;
   text-decoration: none;
-  color: rgba(255, 255, 255, 0.72);
-
-  border-radius: 14px;
-  transition: background-color 120ms ease, color 120ms ease;
+  touch-action: manipulation;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
-/* ICON */
 .nav-icon {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
 }
 
-/* LABEL */
 .nav-label {
-  margin-top: 5px;
-  font-size: 11px;
-  font-weight: 700;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1;
-  letter-spacing: 0.2px;
 }
 
-/* ACTIVE STATE */
 .nav-item.active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d9ffe5;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.25);
 }
 
-/* TAP FEEDBACK */
+.nav-item-primary {
+  overflow: visible;
+}
+
+.trainer-bottom-nav .nav-item::before {
+  background: var(--trainer-accent);
+}
+
+.trainer-bottom-nav .nav-item.active::after {
+  display: none;
+}
+
+.nav-primary-icon {
+  width: 42px;
+  height: 42px;
+  margin-top: -24px;
+  margin-bottom: 1px;
+  display: grid;
+  place-items: center;
+  color: #041108;
+  border: 3px solid #0a1222;
+  border-radius: 14px;
+  background: var(--trainer-accent);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+}
+
+.nav-item-primary.active {
+  color: #d9ffe5;
+  border-color: transparent;
+  background: transparent;
+}
+
 .nav-item:active {
-  opacity: 0.92;
+  opacity: 0.78;
 }
 
-/* TABLET & DESKTOP */
+.nav-item:focus-visible {
+  outline: 3px solid rgba(34, 197, 94, 0.5);
+  outline-offset: 2px;
+}
+
 @media (min-width: 768px) {
   .trainer-content {
     max-width: 520px;
@@ -142,18 +138,18 @@
     max-width: 520px;
     left: 50%;
     right: auto;
+    width: calc(100% - 24px);
     transform: translateX(-50%);
   }
 }
 
-@media (max-width: 767px) {
-  .trainer-content > div:not(.page-transition),
-  .trainer-content > .page-transition > div {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+@media (max-width: 360px) {
+  .trainer-content {
+    padding-inline: 12px;
   }
 
-  .trainer-bottom-nav {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  .nav-label {
+    font-size: 11px;
   }
 }
 

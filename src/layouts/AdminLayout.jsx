@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { logoutApi } from "../api/authApi";
 import { clearRequestCache } from "../api/axiosClient";
@@ -39,8 +39,12 @@ function prefetchAdminPage(pathname) {
 export default function AdminLayout() {
   const nav = useNavigate();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const sidebarRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const wasSidebarOpenRef = useRef(false);
 
   // Prefetch the current page + most likely next page (Users) when the
   // browser is idle, so the network is not saturated right after login.
@@ -79,6 +83,33 @@ export default function AdminLayout() {
   // Smoothly animate content when switching between sidebar links
   const locationKey = location.pathname + location.search;
 
+  useEffect(() => {
+    if (sidebarOpen) {
+      closeButtonRef.current?.focus();
+    } else if (wasSidebarOpenRef.current) {
+      menuButtonRef.current?.focus();
+    }
+    wasSidebarOpenRef.current = sidebarOpen;
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 992px)");
+    const closeOnDesktop = (event) => {
+      if (event.matches) setSidebarOpen(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
+
   const logout = async () => {
     try {
       await logoutApi();
@@ -94,66 +125,85 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="admin-shell d-flex">
+    <div className={`admin-shell d-flex ${sidebarOpen ? "admin-drawer-open" : ""}`}>
+      <a className="admin-skip-link" href="#admin-main-content">Skip to content</a>
+
       {/* Sidebar */}
-      <aside ref={sidebarRef} className="admin-sidebar">
+      <aside ref={sidebarRef} id="admin-navigation" className={`admin-sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Admin navigation">
         <AppScrollbar className="admin-sidebar-scroll" style={{ maxHeight: "100%" }}>
           <div className="p-3">
-            <div className="mb-3 text-center">
-              <i className="bi bi-snow3 admin-logo" aria-hidden="true" />
-              <div className="admin-brand">WINTER ARC</div>
-              <div className="admin-subtitle">Admin Dashboard</div>
+            <div className="admin-sidebar-heading mb-3">
+              <div className="text-center">
+                <i className="bi bi-snow3 admin-logo" aria-hidden="true" />
+                <div className="admin-brand">WINTER ARC</div>
+                <div className="admin-subtitle">Admin Dashboard</div>
+              </div>
+              <button
+                ref={closeButtonRef}
+                type="button"
+                className="admin-sidebar-close"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close admin navigation"
+              >
+                <i className="bi bi-x-lg" aria-hidden="true" />
+              </button>
             </div>
 
-            <div className="d-flex flex-column gap-2">
-              <NavLink to="/admin/dashboard" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-speedometer2"></i> Dashboard
-              </NavLink>
+            <nav onClick={(event) => event.target.closest("a") && setSidebarOpen(false)}>
+              <div className="admin-nav-group">
+                <NavLink to="/admin/dashboard" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-speedometer2" aria-hidden="true" /> Dashboard
+                </NavLink>
+              </div>
 
-              <NavLink to="/admin/users" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-people"></i> Users
-              </NavLink>
+              <div className="admin-nav-group">
+                <NavLink to="/admin/users" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-people" aria-hidden="true" /> Users
+                </NavLink>
+                <NavLink end to="/admin/subscriptions" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-credit-card-2-front" aria-hidden="true" /> Memberships
+                </NavLink>
+                <NavLink to="/admin/subscriptions/classes" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-collection-play" aria-hidden="true" /> Class Memberships
+                </NavLink>
+              </div>
 
-              <NavLink to="/admin/subscriptions" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-credit-card-2-front"></i> Memberships
-              </NavLink>
+              <div className="admin-nav-group">
+                <NavLink to="/admin/attendance" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-credit-card-2-front-fill" aria-hidden="true" /> Attendance
+                </NavLink>
+                <NavLink to="/admin/trainer-bookings" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-calendar-check" aria-hidden="true" /> Trainer Bookings
+                </NavLink>
+                <NavLink to="/admin/boxing-bookings" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-lightning-charge" aria-hidden="true" /> Boxing Bookings
+                </NavLink>
+              </div>
 
-              <NavLink to="/admin/subscriptions/classes" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-collection-play"></i> Class Memberships
-              </NavLink>
+              <div className="admin-nav-group">
+                <NavLink to="/admin/pricing" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-cash-coin" aria-hidden="true" /> Pricing
+                </NavLink>
+                <NavLink to="/admin/points" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-award" aria-hidden="true" /> Points
+                </NavLink>
+              </div>
 
-              <NavLink to="/admin/pricing" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-cash-coin"></i> Pricing
-              </NavLink>
+              <div className="admin-nav-group">
+                <NavLink to="/admin/messages" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-chat-dots" aria-hidden="true" /> Messages
+                </NavLink>
+                <NavLink to="/admin/blogs" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-journal-text" aria-hidden="true" /> Blogs
+                </NavLink>
+              </div>
 
-              <NavLink to="/admin/trainer-bookings" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-calendar-check"></i> Trainer Bookings
-              </NavLink>
-              
-              <NavLink to="/admin/boxing-bookings" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-lightning-charge"></i> Boxing Bookings
-              </NavLink>
-
-              <NavLink to="/admin/attendance" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-credit-card-2-front-fill"></i> Attendance
-              </NavLink>
-
-              <NavLink to="/admin/points" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-award"></i> Points
-              </NavLink>
-
-              <NavLink to="/admin/messages" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-chat-dots"></i> Messages
-              </NavLink>
-
-              <NavLink to="/admin/blogs" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-journal-text"></i> Blogs
-              </NavLink>
-
-              <NavLink to="/admin/settings" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
-                <i className="bi bi-gear"></i> Settings
-              </NavLink>
-            </div>
+              <div className="admin-nav-group">
+                <NavLink to="/admin/settings" className={({isActive}) => `admin-link ${isActive ? "active" : ""}`}>
+                  <i className="bi bi-gear" aria-hidden="true" /> Settings
+                </NavLink>
+              </div>
+            </nav>
 
             <hr style={{ borderColor: "rgba(255,255,255,0.15)" }} />
 
@@ -164,16 +214,37 @@ export default function AdminLayout() {
         </AppScrollbar>
       </aside>
 
+      <button
+        type="button"
+        className="admin-sidebar-backdrop"
+        onClick={() => setSidebarOpen(false)}
+        aria-label="Close admin navigation"
+        tabIndex={sidebarOpen ? 0 : -1}
+      />
+
       {/* Main */}
-      <main className="admin-main">
+      <main id="admin-main-content" className="admin-main" inert={sidebarOpen}>
         <AppScrollbar className="admin-main-scroll" style={{ maxHeight: "100%" }}>
           <div className="admin-main-inner">
             <div className="admin-topbar d-flex align-items-center justify-content-between mb-3">
-              <div>
-                <div style={{ fontWeight: 600 }}>Welcome, Admin</div>
-                <div className="admin-muted small">Manage your gym system here</div>
+              <div className="d-flex align-items-center gap-2">
+                <button
+                  ref={menuButtonRef}
+                  type="button"
+                  className="admin-menu-toggle"
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Open admin navigation"
+                  aria-controls="admin-navigation"
+                  aria-expanded={sidebarOpen}
+                >
+                  <i className="bi bi-list" aria-hidden="true" />
+                </button>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Welcome, Admin</div>
+                  <div className="admin-muted small">Manage your gym system here</div>
+                </div>
               </div>
-              <div className="small admin-muted">
+              <div className="small admin-muted admin-secure-label">
                 <i className="bi bi-shield-lock me-1"></i> Secure Admin
               </div>
             </div>

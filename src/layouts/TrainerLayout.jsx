@@ -3,10 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   FiHome,
   FiLogIn,
-  FiBell,
   FiMessageCircle,
   FiCalendar,
-  FiSettings,
+  FiUser,
 } from "react-icons/fi";
 import axiosClient from "../api/axiosClient";
 import AppScrollbar from "../components/AppScrollbar";
@@ -27,7 +26,7 @@ export default function TrainerLayout() {
       const list = Array.isArray(res?.data) ? res.data : res?.data?.data || res?.data?.notifications || [];
       const unread = list.filter((item) => !item?.read_at).length;
       setUnreadCount((prev) => (prev === unread ? prev : unread));
-    } catch (err) {
+    } catch {
       // Silently fail - don't show badge if we can't fetch
       setUnreadCount((prev) => (prev === 0 ? prev : 0));
     }
@@ -40,7 +39,7 @@ export default function TrainerLayout() {
       }
     };
 
-    fetchUnreadCount();
+    const initialFetch = window.setTimeout(fetchUnreadCount, 0);
     // poll less aggressively to reduce render/network churn while preserving feature
     const interval = setInterval(refreshIfVisible, 20000);
 
@@ -57,6 +56,7 @@ export default function TrainerLayout() {
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      clearTimeout(initialFetch);
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("notifications-updated", handleNotificationUpdate);
@@ -112,7 +112,7 @@ export default function TrainerLayout() {
       <AppScrollbar className="trainer-scrollbar">
         <main className="trainer-content">
           <PageTransition transitionKey={locationKey}>
-            <Outlet />
+            <Outlet context={{ unreadCount }} />
           </PageTransition>
         </main>
       </AppScrollbar>
@@ -127,10 +127,20 @@ export default function TrainerLayout() {
         </NavLink>
 
         <NavLink
-          to="/trainer/scan"
+          to="/trainer/bookings"
           className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
         >
-          <FiLogIn className="nav-icon" />
+          <FiCalendar className="nav-icon" />
+          <span className="nav-label">Bookings</span>
+        </NavLink>
+
+        <NavLink
+          to="/trainer/scan"
+          className={({ isActive }) =>
+            "nav-item nav-item-primary" + (isActive ? " active" : "")
+          }
+        >
+          <span className="nav-primary-icon"><FiLogIn className="nav-icon" /></span>
           <span className="nav-label">Check In</span>
         </NavLink>
 
@@ -143,44 +153,11 @@ export default function TrainerLayout() {
         </NavLink>
 
         <NavLink
-          to="/trainer/bookings"
-          className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
-        >
-          <FiCalendar className="nav-icon" />
-          <span className="nav-label">Bookings</span>
-        </NavLink>
-
-        <NavLink
-          to="/trainer/notifications"
-          className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
-        >
-          <div style={{ position: "relative" }}>
-            <FiBell className="nav-icon" />
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -4,
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  backgroundColor: "#dc3545",
-                  boxShadow: "0 0 0 2px rgba(220, 53, 69, 0.25)",
-                }}
-                aria-hidden="true"
-              />
-            )}
-          </div>
-          <span className="nav-label">Alerts</span>
-        </NavLink>
-
-        <NavLink
           to="/trainer/settings"
           className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
         >
-          <FiSettings className="nav-icon" />
-          <span className="nav-label">Settings</span>
+          <FiUser className="nav-icon" />
+          <span className="nav-label">Profile</span>
         </NavLink>
       </nav>
     </div>
